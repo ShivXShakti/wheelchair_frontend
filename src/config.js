@@ -1,0 +1,21 @@
+// Configuration file for the Wheelchair Frontend
+// Change these values to match your Jetson's setup
+
+const config = {
+  // The ROS2 topic name that your camera publishes images to.
+  // Example: '/camera/color/image_raw' or '/image_raw'
+  CAMERA_TOPIC: '/camera/camera/color/image_raw',
+
+  // Set to true to display the camera feed globally on the UI, false to hide it
+  SHOW_CAMERA: true,
+
+  // The port where the ROS2 web_video_server is running
+  // Changed to 8080 (the default) now that LLaMA runs on 8083
+  VIDEO_SERVER_PORT: 8080,
+  
+  // IP address of the Jetson (leave as empty string '' to auto-detect from browser window location)
+  // If accessing from another device on the network, this will automatically use the Jetson's IP
+  VIDEO_SERVER_IP: '' 
+};
+
+export default config;
