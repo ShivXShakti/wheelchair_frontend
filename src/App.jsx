@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
+import WelcomeScreen from './components/WelcomeScreen';
 import ModeSelection from './components/ModeSelection';
 import VoiceScreen from './components/VoiceScreen';
 import TextScreen from './components/TextScreen';
@@ -9,7 +10,7 @@ import SaveLocationModal from './components/SaveLocationModal';
 import config from './config';
 
 const App = () => {
-  const [currentScreen, setCurrentScreen] = useState('home');
+  const [currentScreen, setCurrentScreen] = useState('welcome');
   const [healthData, setHealthData] = useState(null);
   const [destination, setDestination] = useState(null);
   
@@ -107,6 +108,54 @@ const App = () => {
   const goHome = () => {
     setCurrentScreen('home');
     resetStatus();
+  };
+
+  const startNavigation = async () => {
+    try {
+      await fetch('/start_navigation', { method: 'POST' });
+    } catch (err) {
+      console.error("Failed to start navigation stack:", err);
+    }
+  };
+
+  const startIntelligence = async () => {
+    try {
+      await fetch('/start_intelligence', { method: 'POST' });
+    } catch (err) {
+      console.error("Failed to start intelligence stack:", err);
+    }
+  };
+
+  const handleEnterSystem = async () => {
+    if (healthData?.nav2_ready) {
+      setCurrentScreen('home');
+      return;
+    }
+    
+    // Start navigation stack
+    await startNavigation();
+    
+    // Wait until ready
+    let checkCount = 0;
+    const checkInterval = setInterval(async () => {
+      checkCount++;
+      try {
+        const res = await fetch('/health', { cache: 'no-store' });
+        const data = await res.json();
+        setHealthData(data);
+        if (data?.nav2_ready) {
+          clearInterval(checkInterval);
+          setCurrentScreen('home');
+        }
+      } catch (err) {
+        // Keep polling
+      }
+      if (checkCount > 30) { // Limit to 30 attempts (30s)
+        clearInterval(checkInterval);
+        alert("Navigation startup is taking longer than expected. Please verify your Jetson TMUX logs.");
+        setCurrentScreen('home'); // proceed anyway as fallback
+      }
+    }, 1000);
   };
 
   const addSystemBubble = (feedType, style, text, actionTag, timing = null, extra = {}) => {
@@ -220,30 +269,32 @@ const App = () => {
 
   return (
     <div className="shell">
-      <Header />
+      {currentScreen !== 'welcome' && <Header />}
       
-      <div style={{display: 'flex', gap: '10px', margin: '20px 20px 0 20px'}}>
-        <button className="stop-btn" style={{flex: 1, margin: 0}} onClick={emergencyStop}>
-          <span className="stop-icon">⬛</span>
-          STOP
-        </button>
-        <button 
-          onClick={() => setDevMode(!devMode)}
-          style={{
-            padding: '0 20px', 
-            background: devMode ? 'var(--accent)' : 'var(--surface2)',
-            color: devMode ? '#fff' : 'var(--text)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          {devMode ? 'Dev: ON' : 'Dev: OFF'}
-        </button>
-      </div>
+      {currentScreen !== 'welcome' && (
+        <div style={{display: 'flex', gap: '10px', margin: '20px 20px 0 20px'}}>
+          <button className="stop-btn" style={{flex: 1, margin: 0}} onClick={emergencyStop}>
+            <span className="stop-icon">⬛</span>
+            STOP
+          </button>
+          <button 
+            onClick={() => setDevMode(!devMode)}
+            style={{
+              padding: '0 20px', 
+              background: devMode ? 'var(--accent)' : 'var(--surface2)',
+              color: devMode ? '#fff' : 'var(--text)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            {devMode ? 'Dev: ON' : 'Dev: OFF'}
+          </button>
+        </div>
+      )}
 
-      {devMode && (
+      {currentScreen !== 'welcome' && devMode && (
         <div className="dev-panel">
           <button onClick={() => setSaveModalSource('current')}>
             💾 Save Current Pose
@@ -257,29 +308,33 @@ const App = () => {
         </div>
       )}
 
-      <div className="status-bar">
-        {currentScreen !== 'text' && (
-          <div className={`status-pill ${status.whisper.state}`}>
-            <span className="sicon">🎙</span> {status.whisper.label}
-            {status.whisper.state === 'working' && <span className="spinner"></span>}
+      {currentScreen !== 'welcome' && (
+        <div className="status-bar">
+          {currentScreen !== 'text' && (
+            <div className={`status-pill ${status.whisper.state}`}>
+              <span className="sicon">🎙</span> {status.whisper.label}
+              {status.whisper.state === 'working' && <span className="spinner"></span>}
+            </div>
+          )}
+          <div className={`status-pill ${status.llama.state}`}>
+            <span className="sicon">🧠</span> {status.llama.label}
+            {status.llama.state === 'working' && <span className="spinner"></span>}
           </div>
-        )}
-        <div className={`status-pill ${status.llama.state}`}>
-          <span className="sicon">🧠</span> {status.llama.label}
-          {status.llama.state === 'working' && <span className="spinner"></span>}
+          <div className={`status-pill ${status.ros.state !== 'working' ? (healthData?.nav2_ready ? 'done' : 'err') : 'working'}`}>
+            <span className="sicon">📡</span> {status.ros.state === 'working' ? status.ros.label : (healthData?.nav2_ready ? 'ROS Ready' : 'ROS Offline')}
+            {status.ros.state === 'working' && <span className="spinner"></span>}
+          </div>
         </div>
-        <div className={`status-pill ${status.ros.state !== 'working' ? (healthData?.nav2_ready ? 'done' : 'err') : 'working'}`}>
-          <span className="sicon">📡</span> {status.ros.state === 'working' ? status.ros.label : (healthData?.nav2_ready ? 'ROS Ready' : 'ROS Offline')}
-          {status.ros.state === 'working' && <span className="spinner"></span>}
+      )}
+
+      {currentScreen !== 'welcome' && (
+        <div className={`health-badge ${badgeClass}`} style={{ width: 'fit-content', margin: '0 auto 10px auto', padding: '8px 16px', fontSize: '13px' }}>
+          <span className="dot"></span>
+          <span>{badgeText}</span>
         </div>
-      </div>
+      )}
 
-      <div className={`health-badge ${badgeClass}`} style={{ width: 'fit-content', margin: '0 auto 10px auto', padding: '8px 16px', fontSize: '13px' }}>
-        <span className="dot"></span>
-        <span>{badgeText}</span>
-      </div>
-
-      {healthData && typeof healthData.nav2_status !== 'undefined' && (
+      {currentScreen !== 'welcome' && healthData && typeof healthData.nav2_status !== 'undefined' && (
         <div className="nav2-banner">
           <div className="nav2-status">
             <strong>Status:</strong> {getNav2StatusText(healthData.nav2_status)}
@@ -292,7 +347,7 @@ const App = () => {
         </div>
       )}
 
-      {config.SHOW_CAMERA && streamUrl && (
+      {currentScreen !== 'welcome' && config.SHOW_CAMERA && streamUrl && (
         <div className="camera-container" style={{ marginBottom: '20px' }}>
           <img 
             src={streamUrl} 
@@ -311,7 +366,21 @@ const App = () => {
         </div>
       )}
 
-      {currentScreen === 'home' && <ModeSelection setScreen={setCurrentScreen} />}
+      {currentScreen === 'welcome' && (
+        <WelcomeScreen 
+          navReady={!!healthData?.nav2_ready}
+          onStart={handleEnterSystem}
+        />
+      )}
+
+      {currentScreen === 'home' && (
+        <ModeSelection 
+          setScreen={setCurrentScreen} 
+          healthData={healthData}
+          onStartNavigation={startNavigation}
+          onStartIntelligence={startIntelligence}
+        />
+      )}
       
       {currentScreen === 'voice' && (
         <VoiceScreen 
