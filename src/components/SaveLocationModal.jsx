@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import config from '../config';
 
 const SaveLocationModal = ({ source, onClose, onSuccess }) => {
   const [name, setName] = useState('');
@@ -19,7 +20,7 @@ const SaveLocationModal = ({ source, onClose, onSuccess }) => {
     setError(null);
     
     try {
-      const response = await fetch('/save_location', {
+      const response = await fetch(`${config.API_BASE_URL}/save_location`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

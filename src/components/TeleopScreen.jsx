@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import config from '../config';
 
 const TeleopScreen = ({ goHome }) => {
   const [speed, setSpeed] = useState(0.2);
@@ -48,7 +49,7 @@ const TeleopScreen = ({ goHome }) => {
 
   const publishCommand = () => {
     const { linear_x, angular_z } = commandRef.current;
-    fetch('/teleop', {
+    fetch(`${config.API_BASE_URL}/teleop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ linear_x, angular_z }),

@@ -34,7 +34,7 @@ const App = () => {
     if (config.SHOW_CAMERA) {
       const topic = config.CAMERA_TOPIC;
       // Use FastAPI proxy to bypass mixed-content blocker
-      const url = `/camera_stream?topic=${encodeURIComponent(topic)}`;
+      const url = `${config.API_BASE_URL}/camera_stream?topic=${encodeURIComponent(topic)}`;
       setStreamUrl(url);
     }
   }, []);
@@ -62,7 +62,7 @@ const App = () => {
   useEffect(() => {
     const pollHealth = async () => {
       try {
-        const res = await fetch('/health', { cache: 'no-store' });
+        const res = await fetch(`${config.API_BASE_URL}/health`, { cache: 'no-store' });
         const data = await res.json();
         setHealthData(data);
       } catch (err) {
@@ -90,7 +90,7 @@ const App = () => {
     updateStatus('ros', 'working', 'Stopping...');
 
     try {
-      await fetch('/stop', { 
+      await fetch(`${config.API_BASE_URL}/stop`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ devMode })
@@ -112,7 +112,7 @@ const App = () => {
 
   const startNavigation = async () => {
     try {
-      await fetch('/start_navigation', { method: 'POST' });
+      await fetch(`${config.API_BASE_URL}/start_navigation`, { method: 'POST' });
     } catch (err) {
       console.error("Failed to start navigation stack:", err);
     }
@@ -120,7 +120,7 @@ const App = () => {
 
   const startIntelligence = async () => {
     try {
-      await fetch('/start_intelligence', { method: 'POST' });
+      await fetch(`${config.API_BASE_URL}/start_intelligence`, { method: 'POST' });
     } catch (err) {
       console.error("Failed to start intelligence stack:", err);
     }
@@ -140,7 +140,7 @@ const App = () => {
     const checkInterval = setInterval(async () => {
       checkCount++;
       try {
-        const res = await fetch('/health', { cache: 'no-store' });
+        const res = await fetch(`${config.API_BASE_URL}/health`, { cache: 'no-store' });
         const data = await res.json();
         setHealthData(data);
         if (data?.nav2_ready) {
@@ -221,7 +221,7 @@ const App = () => {
     // Used by Feed chips and StationsScreen
     updateStatus('llama', 'working', 'Processing...');
     try {
-      const res = await fetch('/generate', {
+      const res = await fetch(`${config.API_BASE_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, devMode })

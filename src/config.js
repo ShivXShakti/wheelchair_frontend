@@ -15,7 +15,12 @@ const config = {
   
   // IP address of the Jetson (leave as empty string '' to auto-detect from browser window location)
   // If accessing from another device on the network, this will automatically use the Jetson's IP
-  VIDEO_SERVER_IP: '' 
+  VIDEO_SERVER_IP: '',
+
+  // Base URL of the backend API.
+  // Set to empty string '' to use relative paths (same host/port as frontend).
+  // Set to 'https://10.42.0.1:8443' or similar if running the frontend separately.
+  API_BASE_URL: ''
 };
 
 export default config;

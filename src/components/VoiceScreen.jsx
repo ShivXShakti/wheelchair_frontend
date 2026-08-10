@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Feed from './Feed';
+import config from '../config';
 
 const VoiceScreen = ({ goHome, destination, handleResponse, setStatus, speak, addSystemBubble, messages, devMode, nav2Ready }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -87,7 +88,7 @@ const VoiceScreen = ({ goHome, destination, handleResponse, setStatus, speak, ad
     formData.append('devMode', devModeRef.current ? 'true' : 'false');
 
     try {
-      const res = await fetch('/transcribe', {
+      const res = await fetch(`${config.API_BASE_URL}/transcribe`, {
         method: 'POST',
         body: formData,
       });
