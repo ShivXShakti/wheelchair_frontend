@@ -131,6 +131,18 @@ const App = () => {
     }
   };
 
+  const shutdownNavigation = async () => {
+    const confirmShutdown = window.confirm("Are you sure you want to completely shutdown the navigation system? This will stop all sensors and return to the welcome screen.");
+    if (!confirmShutdown) return;
+
+    try {
+      setCurrentScreen('welcome');
+      await fetch(`${config.API_BASE_URL}/shutdown_navigation`, { method: 'POST' });
+    } catch (err) {
+      console.error("Failed to shutdown navigation stack:", err);
+    }
+  };
+
   const handleEnterSystem = async () => {
     if (healthData?.nav2_ready) {
       setCurrentScreen('home');
@@ -295,6 +307,20 @@ const App = () => {
             }}
           >
             {devMode ? 'Dev: ON' : 'Dev: OFF'}
+          </button>
+          <button 
+            onClick={shutdownNavigation}
+            style={{
+              padding: '0 20px', 
+              background: '#e74c3c',
+              color: '#fff',
+              border: '1px solid #e74c3c',
+              borderRadius: 'var(--radius)',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Navigation Shutdown
           </button>
         </div>
       )}
