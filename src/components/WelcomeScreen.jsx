@@ -4,9 +4,15 @@ const WelcomeScreen = ({ navReady, onStart }) => {
   const [loading, setLoading] = useState(false);
 
   const handleStart = async () => {
+    console.log("[WelcomeScreen] Start button clicked!");
     setLoading(true);
-    await onStart();
-    setLoading(false);
+    try {
+      await onStart();
+    } catch (e) {
+      console.error("[WelcomeScreen] onStart failed:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -111,10 +111,15 @@ const App = () => {
   };
 
   const startNavigation = async () => {
+    console.log("[App] startNavigation() called. API_BASE_URL =", config.API_BASE_URL);
     try {
-      await fetch(`${config.API_BASE_URL}/start_navigation`, { method: 'POST' });
+      const url = `${config.API_BASE_URL}/start_navigation`;
+      console.log("[App] Fetching url:", url);
+      const res = await fetch(url, { method: 'POST' });
+      const data = await res.json();
+      console.log("[App] start_navigation response:", data);
     } catch (err) {
-      console.error("Failed to start navigation stack:", err);
+      console.error("[App] Failed to start navigation stack:", err);
     }
   };
 
