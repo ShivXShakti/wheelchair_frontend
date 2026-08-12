@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 
-const WelcomeScreen = ({ navReady, onStart }) => {
+const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose }) => {
   const [loading, setLoading] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [localizing, setLocalizing] = useState(false);
+  const [message, setMessage] = useState('');
 
   const handleStart = async () => {
     console.log("[WelcomeScreen] Start button clicked!");
@@ -14,6 +17,33 @@ const WelcomeScreen = ({ navReady, onStart }) => {
       setLoading(false);
     }
   };
+
+  const handleManualLocalize = async () => {
+    const loc = selectedLocation || (healthData?.has_last_location ? 'last_location' : healthData?.location_names?.[0]);
+    if (!loc) {
+      setMessage('No locations available.');
+      return;
+    }
+    setLocalizing(true);
+    setMessage('');
+    try {
+      const success = await onSetInitialPose(loc);
+      if (success) {
+        setMessage('Initial pose sent! Aligning...');
+      } else {
+        setMessage('Failed to set initial pose.');
+      }
+    } catch (e) {
+      console.error(e);
+      setMessage('Error occurred.');
+    } finally {
+      setLocalizing(false);
+    }
+  };
+
+  // Extract candidate locations and flags
+  const locationNames = healthData?.location_names || [];
+  const hasLastLocation = healthData?.has_last_location || false;
 
   return (
     <div className="welcome-screen" style={{
@@ -106,6 +136,94 @@ const WelcomeScreen = ({ navReady, onStart }) => {
             <span style={{ color: '#e74c3c', fontWeight: 600 }}>Offline ✗</span>
           )}
         </div>
+
+        {!navReady && (locationNames.length > 0 || hasLastLocation) && (
+          <div style={{
+            marginTop: '30px',
+            paddingTop: '20px',
+            borderTop: '1px solid var(--border)',
+            textAlign: 'left'
+          }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: 600,
+              marginBottom: '10px',
+              color: 'var(--text)'
+            }}>
+              Manual Localization Fallback
+            </label>
+            <p style={{
+              fontSize: '12px',
+              color: 'var(--text-muted)',
+              marginBottom: '15px',
+              lineHeight: '1.4'
+            }}>
+              If automatic initialization fails, select the wheelchair's current area to set the initial pose.
+            </p>
+            
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  background: 'var(--surface2)',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  fontSize: '14px',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {selectedLocation === '' && <option value="">-- Choose Location --</option>}
+                
+                {hasLastLocation && (
+                  <option value="last_location">📍 Wheelchair Last Location</option>
+                )}
+                
+                {locationNames.map((name) => (
+                  <option key={name} value={name}>
+                    🏢 {name}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={handleManualLocalize}
+                disabled={localizing || (!selectedLocation && !hasLastLocation && locationNames.length === 0)}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 'var(--radius)',
+                  cursor: localizing ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 12px rgba(56, 239, 125, 0.2)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {localizing ? 'Setting...' : 'Set Pose'}
+              </button>
+            </div>
+            
+            {message && (
+              <div style={{
+                marginTop: '12px',
+                fontSize: '12px',
+                color: message.includes('failed') || message.includes('Error') ? '#e74c3c' : '#2ecc71',
+                textAlign: 'center',
+                fontWeight: 500
+              }}>
+                {message}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -143,6 +143,21 @@ const App = () => {
     }
   };
 
+  const setInitialPose = async (location) => {
+    try {
+      const response = await fetch(`${config.API_BASE_URL}/set_initial_pose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location })
+      });
+      const data = await response.json();
+      return data.status === 'success';
+    } catch (err) {
+      console.error("Failed to set initial pose:", err);
+      return false;
+    }
+  };
+
   const handleEnterSystem = async () => {
     if (healthData?.nav2_ready) {
       setCurrentScreen('home');
@@ -401,6 +416,8 @@ const App = () => {
         <WelcomeScreen 
           navReady={!!healthData?.nav2_ready}
           onStart={handleEnterSystem}
+          healthData={healthData}
+          onSetInitialPose={setInitialPose}
         />
       )}
 
