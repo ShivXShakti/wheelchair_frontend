@@ -413,6 +413,18 @@ const App = () => {
           onStart={handleEnterSystem}
           healthData={healthData}
           onSetInitialPose={setInitialPose}
+          setScreen={setCurrentScreen}
+        />
+      )}
+
+      {currentScreen === 'dev' && (
+        <DevScreen 
+          setScreen={setCurrentScreen}
+          healthData={healthData}
+          onShutdownNavigation={shutdownNavigation}
+          onStartNavigation={startNavigation}
+          onStartIntelligence={startIntelligence}
+          onSetInitialPose={setInitialPose}
         />
       )}
 
