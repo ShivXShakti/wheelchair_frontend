@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose }) => {
+const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose, setScreen }) => {
   const [loading, setLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [localizing, setLocalizing] = useState(false);
@@ -136,6 +136,32 @@ const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose }) => {
             <span style={{ color: '#e74c3c', fontWeight: 600 }}>Offline ✗</span>
           )}
         </div>
+
+        {healthData?.enable_developer !== false && (
+          <div style={{ marginTop: '16px' }}>
+            <button 
+              onClick={() => setScreen('dev')}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                fontSize: '14px',
+                fontWeight: 600,
+                background: 'var(--surface2)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              🛠️ Enter Developer Mode
+            </button>
+          </div>
+        )}
 
         {!navReady && (locationNames.length > 0 || hasLastLocation) && (
           <div style={{

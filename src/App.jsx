@@ -7,6 +7,7 @@ import TextScreen from './components/TextScreen';
 import TeleopScreen from './components/TeleopScreen';
 import StationsScreen from './components/StationsScreen';
 import SaveLocationModal from './components/SaveLocationModal';
+import DevScreen from './components/DevScreen';
 import config from './config';
 
 const App = () => {
@@ -309,38 +310,32 @@ const App = () => {
             <span className="stop-icon">⬛</span>
             STOP
           </button>
-          <button 
-            onClick={() => setDevMode(!devMode)}
-            style={{
-              padding: '0 20px', 
-              background: devMode ? 'var(--accent)' : 'var(--surface2)',
-              color: devMode ? '#fff' : 'var(--text)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            {devMode ? 'Dev: ON' : 'Dev: OFF'}
-          </button>
-          <button 
-            onClick={shutdownNavigation}
-            style={{
-              padding: '0 20px', 
-              background: '#e74c3c',
-              color: '#fff',
-              border: '1px solid #e74c3c',
-              borderRadius: 'var(--radius)',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Navigation Shutdown
-          </button>
+          {healthData?.enable_developer !== false && (
+            <button 
+              onClick={() => {
+                if (currentScreen === 'dev') {
+                  setCurrentScreen('welcome');
+                } else {
+                  setCurrentScreen('dev');
+                }
+              }}
+              style={{
+                padding: '0 20px', 
+                background: currentScreen === 'dev' ? '#f39c12' : 'var(--surface2)',
+                color: currentScreen === 'dev' ? '#fff' : 'var(--text)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              {currentScreen === 'dev' ? '🛠️ Dev Mode: Active' : '🛠️ Dev Dashboard'}
+            </button>
+          )}
         </div>
       )}
 
-      {currentScreen !== 'welcome' && devMode && (
+      {currentScreen !== 'welcome' && currentScreen !== 'dev' && devMode && (
         <div className="dev-panel">
           <button onClick={() => setSaveModalSource('current')}>
             💾 Save Current Pose

@@ -103,7 +103,7 @@ const ModeSelection = ({ setScreen, healthData, onStartNavigation, onStartIntell
           <div className="mode-label" style={{ fontSize: '18px', marginTop: '12px' }}>Teleoperation Mode</div>
           <div className="mode-desc" style={{ marginTop: '8px' }}>Manual Joystick &amp; D-pad control</div>
           <div style={{ marginTop: '12px', fontSize: '12px', color: navReady ? '#2ecc71' : '#e74c3c', fontWeight: 600 }}>
-            {navReady ? 'Ready ✓' : 'Click to Launch Navigation'}
+            {navReady ? 'Ready ✓' : 'Offline ✗ (Click to Launch)'}
           </div>
         </div>
 
@@ -121,83 +121,47 @@ const ModeSelection = ({ setScreen, healthData, onStartNavigation, onStartIntell
           <div className="mode-label" style={{ fontSize: '18px', marginTop: '12px' }}>Autonomous Mode</div>
           <div className="mode-desc" style={{ marginTop: '8px' }}>SROS2 AI Voice &amp; Text navigation</div>
           <div style={{ marginTop: '12px', fontSize: '12px', color: (navReady && intelReady) ? '#2ecc71' : '#e74c3c', fontWeight: 600 }}>
-            {(navReady && intelReady) ? 'Ready ✓' : 'Click to Launch AI Services'}
+            {(navReady && intelReady) ? 'Ready ✓' : 'Offline ✗ (Click to Launch AI)'}
           </div>
         </div>
       </div>
 
-      {/* Status & Relaunch Control Panel */}
+      {/* Quick Status Panel */}
       <div className="status-panel" style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
         padding: '16px 20px',
-        marginTop: '12px'
+        marginTop: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
       }}>
-        <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--text-muted)' }}>SYSTEM RECOVERY PANEL</h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Navigation Stack */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="dot" style={{ 
-                width: '10px', 
-                height: '10px', 
-                borderRadius: '50%', 
-                background: launchingNav ? '#f39c12' : (navReady ? '#2ecc71' : '#e74c3c'),
-                display: 'inline-block'
-              }}></span>
-              <span style={{ fontSize: '14px' }}>Navigation Stack</span>
-            </div>
-            <button 
-              onClick={handleStartNav}
-              disabled={launchingNav}
-              className="action-btn"
-              style={{
-                padding: '6px 12px',
-                fontSize: '12px',
-                background: launchingNav ? 'var(--surface2)' : 'var(--accent)',
-                color: '#white',
-                border: 'none',
-                borderRadius: 'var(--radius)',
-                cursor: launchingNav ? 'not-allowed' : 'pointer',
-                fontWeight: 600
-              }}
-            >
-              {launchingNav ? 'Relaunching...' : (navReady ? 'Relaunch' : 'Launch')}
-            </button>
-          </div>
-
-          {/* AI Intelligence */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="dot" style={{ 
-                width: '10px', 
-                height: '10px', 
-                borderRadius: '50%', 
-                background: launchingIntel ? '#f39c12' : (intelReady ? '#2ecc71' : '#e74c3c'),
-                display: 'inline-block'
-              }}></span>
-              <span style={{ fontSize: '14px' }}>AI Intelligence (LLaMA/Whisper)</span>
-            </div>
-            <button 
-              onClick={handleStartIntel}
-              disabled={launchingIntel}
-              className="action-btn"
-              style={{
-                padding: '6px 12px',
-                fontSize: '12px',
-                background: launchingIntel ? 'var(--surface2)' : 'var(--accent)',
-                color: '#white',
-                border: 'none',
-                borderRadius: 'var(--radius)',
-                cursor: launchingIntel ? 'not-allowed' : 'pointer',
-                fontWeight: 600
-              }}
-            >
-              {launchingIntel ? 'Relaunching...' : (intelReady ? 'Relaunch' : 'Launch')}
-            </button>
-          </div>
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+          SYSTEM STATUS: {navReady ? (
+            <span style={{ color: '#2ecc71', fontWeight: 600 }}>Navigation Online ✓</span>
+          ) : (
+            <span style={{ color: '#e74c3c', fontWeight: 600 }}>Navigation Offline ✗</span>
+          )}
         </div>
+        {!navReady && (
+          <button 
+            onClick={handleStartNav}
+            disabled={launchingNav}
+            style={{
+              padding: '8px 16px',
+              fontSize: '12px',
+              background: 'linear-gradient(135deg, var(--accent), #3a7bd5)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--radius)',
+              cursor: launchingNav ? 'not-allowed' : 'pointer',
+              fontWeight: 600
+            }}
+          >
+            {launchingNav ? 'Launching...' : 'Launch Navigation'}
+          </button>
+        )}
       </div>
     </div>
   );
