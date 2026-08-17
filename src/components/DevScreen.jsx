@@ -13,12 +13,45 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
   const [actionMsg, setActionMsg] = useState('');
   const [showRebootModal, setShowRebootModal] = useState(false);
   const [rebooting, setRebooting] = useState(false);
+  const [glassRunning, setGlassRunning] = useState(true);
+  const [togglingGlass, setTogglingGlass] = useState(false);
 
-  // Fetch BBS config and config flags on mount
+  // Fetch BBS config, config flags, and glass status on mount
   useEffect(() => {
     fetchBbsConfig();
     fetchConfig();
+    fetchGlassStatus();
+    const interval = setInterval(fetchGlassStatus, 4000);
+    return () => clearInterval(interval);
   }, []);
+
+  const fetchGlassStatus = async () => {
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/glass_detection/status`);
+      const data = await res.json();
+      if (data.running !== undefined) setGlassRunning(data.running);
+    } catch (e) {
+      console.error("Failed to fetch glass detection status:", e);
+    }
+  };
+
+  const handleToggleGlass = async (action) => {
+    setTogglingGlass(true);
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/glass_detection/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      const data = await res.json();
+      setActionMsg(data.message || `Glass detection action '${action}' sent.`);
+      setTimeout(fetchGlassStatus, 1500);
+    } catch (e) {
+      setActionMsg(`Failed to ${action} glass detection.`);
+    } finally {
+      setTogglingGlass(false);
+    }
+  };
 
   const fetchConfig = async () => {
     try {
@@ -340,6 +373,65 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
           <button onClick={() => handleNavRelaunchPane('3')} style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', textAlign: 'left', cursor: 'pointer' }}>
             <strong>🌐 Pane 3: Bridge &amp; Video</strong>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Web Video Server &amp; ROS Bridge</div>
+          </button>
+        </div>
+      </div>
+
+      {/* SECTION 3.5: SILICA GLASS DETECTION NODE CONTROL */}
+      <div className="status-panel" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '16px', color: '#e67e22' }}>🔍 SILICA GLASS DETECTION CONTROL (Window 2)</h3>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Controls `ros2 launch silica_ros align_metric.launch.py` (Camera PointCloud &amp; Glass Costmap Reconstruction)
+            </div>
+          </div>
+          <span style={{ 
+            padding: '6px 12px', 
+            borderRadius: '12px', 
+            fontSize: '12px', 
+            fontWeight: 700, 
+            background: glassRunning ? 'rgba(39, 174, 96, 0.2)' : 'rgba(231, 76, 60, 0.2)',
+            color: glassRunning ? '#2ecc71' : '#e74c3c',
+            border: `1px solid ${glassRunning ? '#2ecc71' : '#e74c3c'}`
+          }}>
+            {glassRunning ? '🟢 RUNNING' : '🔴 STOPPED'}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button 
+            onClick={() => handleToggleGlass('stop')}
+            disabled={togglingGlass}
+            style={{ 
+              flex: 1, 
+              padding: '12px', 
+              background: 'linear-gradient(135deg, #c0392b, #e74c3c)', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 'var(--radius)', 
+              fontWeight: 600, 
+              cursor: togglingGlass ? 'not-allowed' : 'pointer' 
+            }}
+          >
+            🛑 Stop / Terminate Glass Detection
+          </button>
+          
+          <button 
+            onClick={() => handleToggleGlass('start')}
+            disabled={togglingGlass}
+            style={{ 
+              flex: 1, 
+              padding: '12px', 
+              background: 'linear-gradient(135deg, #27ae60, #2ecc71)', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 'var(--radius)', 
+              fontWeight: 600, 
+              cursor: togglingGlass ? 'not-allowed' : 'pointer' 
+            }}
+          >
+            ▶️ Start / Relaunch Glass Detection
           </button>
         </div>
       </div>
