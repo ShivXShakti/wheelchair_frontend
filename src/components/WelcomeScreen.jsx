@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose, setScreen }) => {
+const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose, setScreen, onOpenDev }) => {
   const [loading, setLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [localizing, setLocalizing] = useState(false);
@@ -140,7 +140,7 @@ const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose, setScr
         {healthData?.enable_developer !== false && (
           <div style={{ marginTop: '16px' }}>
             <button 
-              onClick={() => setScreen('dev')}
+              onClick={onOpenDev ? onOpenDev : () => setScreen('dev')}
               style={{
                 width: '100%',
                 padding: '12px 20px',

@@ -27,18 +27,157 @@ const App = () => {
   const [textMessages, setTextMessages] = useState([]);
   const [streamUrl, setStreamUrl] = useState('');
 
-  // Dev Mode
+  // Dev Mode & Security States
   const [devMode, setDevMode] = useState(false);
   const [saveModalSource, setSaveModalSource] = useState(null); // 'current' or 'goal'
 
-  useEffect(() => {
-    if (config.SHOW_CAMERA) {
-      const topic = config.CAMERA_TOPIC;
-      // Use FastAPI proxy to bypass mixed-content blocker
-      const url = `${config.API_BASE_URL}/camera_stream?topic=${encodeURIComponent(topic)}`;
-      setStreamUrl(url);
+  // Client Session & Pairing States
+  const [clientId] = useState(() => {
+    let id = localStorage.getItem("wheelchair_client_id");
+    if (!id) {
+      id = 'client_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+      localStorage.setItem("wheelchair_client_id", id);
     }
-  }, []);
+    return id;
+  });
+
+  const [sessionAllowed, setSessionAllowed] = useState(true);
+  const [sessionBlockedReason, setSessionBlockedReason] = useState('');
+
+  // Device Pairing & Dev Password Modals
+  const [isPaired, setIsPaired] = useState(() => !!localStorage.getItem("device_pairing_token"));
+  const [showPairingModal, setShowPairingModal] = useState(false);
+  const [pairingKeyInput, setPairingKeyInput] = useState('');
+  const [pairingMsg, setPairingMsg] = useState('');
+  const [verifyingPairing, setVerifyingPairing] = useState(false);
+
+  const [showDevPassModal, setShowDevPassModal] = useState(false);
+  const [devPassInput, setDevPassInput] = useState('');
+  const [devPassMsg, setDevPassMsg] = useState('');
+  const [verifyingDevPass, setVerifyingDevPass] = useState(false);
+  const [isDevAuthenticated, setIsDevAuthenticated] = useState(false);
+
+  // Session Heartbeat Polling
+  useEffect(() => {
+    const sendHeartbeat = async () => {
+      try {
+        const res = await fetch(`${config.API_BASE_URL}/session/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: clientId })
+        });
+        const data = await res.json();
+        if (data.allowed !== undefined) {
+          setSessionAllowed(data.allowed);
+          if (!data.allowed) {
+            setSessionBlockedReason(data.message || 'Maximum concurrent user limit reached.');
+          }
+        }
+      } catch (e) {
+        console.error("Heartbeat error:", e);
+      }
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 4000);
+
+    const handleBeforeUnload = () => {
+      navigator.sendBeacon(`${config.API_BASE_URL}/session/disconnect`, JSON.stringify({ client_id: clientId }));
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [clientId]);
+
+  // Check if Device Pairing Modal should be shown
+  useEffect(() => {
+    if (healthData?.enable_developer !== false) {
+      if (!localStorage.getItem("device_pairing_token")) {
+        setShowPairingModal(true);
+      } else {
+        setShowPairingModal(false);
+      }
+    } else {
+      setShowPairingModal(false);
+    }
+  }, [healthData]);
+
+  const handleVerifyPairing = async (e) => {
+    e.preventDefault();
+    if (!pairingKeyInput.trim()) {
+      setPairingMsg('❌ Please enter the Secret Device Pairing Key.');
+      return;
+    }
+    setVerifyingPairing(true);
+    setPairingMsg('');
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/device/verify_pairing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pairing_key: pairingKeyInput.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem("device_pairing_token", data.token);
+        setIsPaired(true);
+        setShowPairingModal(false);
+        setPairingKeyInput('');
+      } else {
+        setPairingMsg(`❌ ${data.message || 'Incorrect pairing key.'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setPairingMsg('❌ Error verifying pairing key.');
+    } finally {
+      setVerifyingPairing(false);
+    }
+  };
+
+  const handleVerifyDevPassword = async (e) => {
+    e.preventDefault();
+    if (!devPassInput) {
+      setDevPassMsg('❌ Please enter Developer Password.');
+      return;
+    }
+    setVerifyingDevPass(true);
+    setDevPassMsg('');
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/dev/verify_password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: devPassInput })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsDevAuthenticated(true);
+        setShowDevPassModal(false);
+        setDevPassInput('');
+        setCurrentScreen('dev');
+      } else {
+        setDevPassMsg(`❌ ${data.message || 'Incorrect password.'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setDevPassMsg('❌ Error verifying password.');
+    } finally {
+      setVerifyingDevPass(false);
+    }
+  };
+
+  const handleOpenDevDashboard = () => {
+    if (isDevAuthenticated || currentScreen === 'dev') {
+      if (currentScreen === 'dev') {
+        setCurrentScreen('welcome');
+      } else {
+        setCurrentScreen('dev');
+      }
+    } else {
+      setShowDevPassModal(true);
+    }
+  };
 
   // Setup speech synthesis
   useEffect(() => {
@@ -312,13 +451,7 @@ const App = () => {
           </button>
           {healthData?.enable_developer !== false && (
             <button 
-              onClick={() => {
-                if (currentScreen === 'dev') {
-                  setCurrentScreen('welcome');
-                } else {
-                  setCurrentScreen('dev');
-                }
-              }}
+              onClick={handleOpenDevDashboard}
               style={{
                 padding: '0 20px', 
                 background: currentScreen === 'dev' ? '#f39c12' : 'var(--surface2)',
@@ -414,6 +547,7 @@ const App = () => {
           healthData={healthData}
           onSetInitialPose={setInitialPose}
           setScreen={setCurrentScreen}
+          onOpenDev={handleOpenDevDashboard}
         />
       )}
 
@@ -490,6 +624,103 @@ const App = () => {
             setSaveModalSource(null);
           }}
         />
+      )}
+
+      {/* 1. CONCURRENT USER LIMIT EXCEEDED MODAL */}
+      {!sessionAllowed && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 15, 20, 0.95)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid #e74c3c', borderRadius: 'var(--radius)', padding: '35px', maxWidth: '440px', width: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⛔</div>
+            <h3 style={{ color: '#e74c3c', margin: '0 0 12px 0', fontSize: '20px' }}>WHEELCHAIR SYSTEM BUSY</h3>
+            <p style={{ fontSize: '14px', color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+              {sessionBlockedReason || "Another device is currently controlling the wheelchair (Limit: 1 active user)."}
+            </p>
+            <div style={{ padding: '12px', background: 'var(--surface2)', borderRadius: 'var(--radius)', fontSize: '12px', color: 'var(--text-muted)' }}>
+              🔒 Controls are locked to prevent conflicting commands. Please wait for the active user to disconnect.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. DEVICE PAIRING MODAL */}
+      {showPairingModal && sessionAllowed && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 15, 20, 0.92)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid #3498db', borderRadius: 'var(--radius)', padding: '30px', maxWidth: '420px', width: '90%', textAlign: 'center' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📱</div>
+            <h3 style={{ color: '#3498db', margin: '0 0 8px 0', fontSize: '18px' }}>DEVICE AUTHORIZATION REQUIRED</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '20px' }}>
+              Enter the Secret Device Pairing Key to unlock controls on this device.
+            </p>
+            <form onSubmit={handleVerifyPairing} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <input 
+                type="password"
+                placeholder="Enter Secret Pairing Key (e.g. ducky8443)"
+                value={pairingKeyInput}
+                onChange={(e) => setPairingKeyInput(e.target.value)}
+                style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '14px', textAlign: 'center' }}
+              />
+              <button 
+                type="submit"
+                disabled={verifyingPairing}
+                style={{ padding: '12px', background: 'linear-gradient(135deg, #2980b9, #3498db)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 600, cursor: verifyingPairing ? 'not-allowed' : 'pointer' }}
+              >
+                {verifyingPairing ? 'Verifying...' : '🔑 Authorize Device'}
+              </button>
+            </form>
+            {pairingMsg && (
+              <div style={{ marginTop: '14px', fontSize: '12px', color: pairingMsg.includes('❌') ? '#e74c3c' : '#2ecc71', fontWeight: 500 }}>
+                {pairingMsg}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. DEVELOPER MODE PASSWORD MODAL */}
+      {showDevPassModal && sessionAllowed && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 15, 20, 0.90)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid #f39c12', borderRadius: 'var(--radius)', padding: '30px', maxWidth: '400px', width: '90%', textAlign: 'center' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+            <h3 style={{ color: '#f39c12', margin: '0 0 8px 0', fontSize: '18px' }}>DEVELOPER AUTHENTICATION</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '20px' }}>
+              Enter Developer Password to access system settings.
+            </p>
+            <form onSubmit={handleVerifyDevPassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <input 
+                type="password"
+                placeholder="Developer Password"
+                value={devPassInput}
+                onChange={(e) => setDevPassInput(e.target.value)}
+                style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '14px', textAlign: 'center' }}
+              />
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowDevPassModal(false);
+                    setDevPassInput('');
+                    setDevPassMsg('');
+                  }}
+                  style={{ flex: 1, padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={verifyingDevPass}
+                  style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #f39c12, #e67e22)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 600, cursor: verifyingDevPass ? 'not-allowed' : 'pointer' }}
+                >
+                  {verifyingDevPass ? 'Checking...' : 'Unlock'}
+                </button>
+              </div>
+            </form>
+            {devPassMsg && (
+              <div style={{ marginTop: '14px', fontSize: '12px', color: devPassMsg.includes('❌') ? '#e74c3c' : '#2ecc71', fontWeight: 500 }}>
+                {devPassMsg}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
