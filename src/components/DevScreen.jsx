@@ -16,6 +16,50 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
   const [glassRunning, setGlassRunning] = useState(true);
   const [togglingGlass, setTogglingGlass] = useState(false);
 
+  // Save location state
+  const [saveName, setSaveName] = useState('');
+  const [saveSource, setSaveSource] = useState('current');
+  const [saveAliases, setSaveAliases] = useState('');
+  const [saveTags, setSaveTags] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+
+  const handleSaveLocation = async (e) => {
+    e.preventDefault();
+    if (!saveName.trim()) {
+      setSaveMsg('❌ Please enter a location name (e.g. kitchen, desk_1).');
+      return;
+    }
+    setSavingLocation(true);
+    setSaveMsg('');
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/save_location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: saveName.trim(),
+          source: saveSource,
+          aliases: saveAliases,
+          tags: saveTags
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setSaveMsg(`✅ Location '${saveName.trim()}' saved successfully to map_semantics.yaml!`);
+        setSaveName('');
+        setSaveAliases('');
+        setSaveTags('');
+      } else {
+        setSaveMsg(`❌ ${data.message || 'Failed to save location.'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setSaveMsg('❌ Error communicating with backend API.');
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
   // Fetch BBS config, config flags, and glass status on mount
   useEffect(() => {
     fetchBbsConfig();
@@ -359,8 +403,8 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           <button onClick={() => handleNavRelaunchPane('0')} style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', textAlign: 'left', cursor: 'pointer' }}>
-            <strong>🤖 Pane 0: Bringup</strong>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>CAN Bus, Motors &amp; LiDAR Sensors</div>
+            <strong>🤖 Pane 0: Bringup (LiDAR + Motors)</strong>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Livox LiDAR (0.0) &amp; Kangaroo Base Controller (0.1 /dev/ttyACM0)</div>
           </button>
           <button onClick={() => handleNavRelaunchPane('1')} style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', textAlign: 'left', cursor: 'pointer' }}>
             <strong>📍 Pane 1: 3D-BBS &amp; Nav2</strong>
@@ -527,6 +571,73 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
           {localizeMsg && (
             <div style={{ marginTop: '10px', fontSize: '12px', color: localizeMsg.includes('Failed') ? '#e74c3c' : '#2ecc71', fontWeight: 500 }}>
               {localizeMsg}
+            </div>
+          )}
+        </div>
+
+        {/* Save Current Wheelchair Pose / Location Form */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '16px' }}>
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#f39c12' }}>💾 Save Wheelchair Current Pose / Location</h4>
+          <form onSubmit={handleSaveLocation} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', alignItems: 'end' }}>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>LOCATION NAME *</label>
+              <input 
+                type="text"
+                placeholder="e.g. kitchen, desk_1"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                style={{ width: '100%', padding: '10px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '13px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>POSE SOURCE</label>
+              <select
+                value={saveSource}
+                onChange={(e) => setSaveSource(e.target.value)}
+                style={{ width: '100%', padding: '10px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '13px' }}
+              >
+                <option value="current">📍 Current Wheelchair Pose (Live TF map-&gt;base_link)</option>
+                <option value="goal">🎯 Goal Pose (Latest RViz Goal)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>ALIASES (comma-separated)</label>
+              <input 
+                type="text"
+                placeholder="e.g. pantry, workspace"
+                value={saveAliases}
+                onChange={(e) => setSaveAliases(e.target.value)}
+                style={{ width: '100%', padding: '10px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '13px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>TAGS (comma-separated)</label>
+              <input 
+                type="text"
+                placeholder="e.g. home, office"
+                value={saveTags}
+                onChange={(e) => setSaveTags(e.target.value)}
+                style={{ width: '100%', padding: '10px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '13px' }}
+              />
+            </div>
+
+            <div>
+              <button 
+                type="submit"
+                disabled={savingLocation}
+                style={{ width: '100%', padding: '10px 16px', background: 'linear-gradient(135deg, #f39c12, #e67e22)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 600, cursor: savingLocation ? 'not-allowed' : 'pointer' }}
+              >
+                {savingLocation ? 'Saving...' : '💾 Save Location'}
+              </button>
+            </div>
+          </form>
+
+          {saveMsg && (
+            <div style={{ marginTop: '10px', fontSize: '12px', color: saveMsg.includes('❌') ? '#e74c3c' : '#2ecc71', fontWeight: 500 }}>
+              {saveMsg}
             </div>
           )}
         </div>
