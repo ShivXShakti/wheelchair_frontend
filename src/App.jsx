@@ -27,6 +27,14 @@ const App = () => {
   const [textMessages, setTextMessages] = useState([]);
   const [streamUrl, setStreamUrl] = useState('');
 
+  useEffect(() => {
+    if (config.SHOW_CAMERA) {
+      const topic = config.CAMERA_TOPIC || '/glass_detection/overlay';
+      const url = `${config.API_BASE_URL}/camera_stream?topic=${encodeURIComponent(topic)}`;
+      setStreamUrl(url);
+    }
+  }, []);
+
   // Dev Mode & Security States
   const [devMode, setDevMode] = useState(false);
   const [saveModalSource, setSaveModalSource] = useState(null); // 'current' or 'goal'
