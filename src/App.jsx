@@ -654,7 +654,7 @@ const App = () => {
             <form onSubmit={handleVerifyPairing} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <input 
                 type="password"
-                placeholder="Enter Secret Pairing Key (e.g. ducky8443)"
+                placeholder="Enter Secret Pairing Key"
                 value={pairingKeyInput}
                 onChange={(e) => setPairingKeyInput(e.target.value)}
                 style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '14px', textAlign: 'center' }}
