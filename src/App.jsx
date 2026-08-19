@@ -528,8 +528,13 @@ const App = () => {
             alt="ROS Camera Stream" 
             className="camera-feed"
             onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'flex';
+              if (streamUrl.includes('/glass_detection/overlay')) {
+                const fallbackUrl = `${config.API_BASE_URL}/camera_stream?topic=${encodeURIComponent('/camera1/color/image_raw')}`;
+                setStreamUrl(fallbackUrl);
+              } else {
+                e.target.style.display = 'none';
+                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+              }
             }}
           />
           <div className="camera-error" style={{ display: 'none' }}>

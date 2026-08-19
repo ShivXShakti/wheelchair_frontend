@@ -4,7 +4,7 @@
 const config = {
   // The ROS2 topic name that your camera publishes images to.
   // Example: '/camera/color/image_raw' or '/image_raw'
-  CAMERA_TOPIC: '/camera1/color/image_raw',
+  CAMERA_TOPIC: '/glass_detection/overlay',
 
   // Set to true to display the camera feed globally on the UI, false to hide it
   SHOW_CAMERA: true,
