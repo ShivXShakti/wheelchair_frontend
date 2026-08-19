@@ -521,7 +521,7 @@ const App = () => {
         </div>
       )}
 
-      {currentScreen !== 'welcome' && config.SHOW_CAMERA && streamUrl && (
+      {config.SHOW_CAMERA && streamUrl && (
         <div className="camera-container" style={{ marginBottom: '20px' }}>
           <img 
             src={streamUrl} 
