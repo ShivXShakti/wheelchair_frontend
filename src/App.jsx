@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
+import WelcomeScreen from './components/WelcomeScreen';
 import ModeSelection from './components/ModeSelection';
 import VoiceScreen from './components/VoiceScreen';
 import TextScreen from './components/TextScreen';
 import TeleopScreen from './components/TeleopScreen';
 import StationsScreen from './components/StationsScreen';
 import SaveLocationModal from './components/SaveLocationModal';
+import DevScreen from './components/DevScreen';
 import config from './config';
 
 const App = () => {
-  const [currentScreen, setCurrentScreen] = useState('home');
+  const [currentScreen, setCurrentScreen] = useState('welcome');
   const [healthData, setHealthData] = useState(null);
   const [destination, setDestination] = useState(null);
   
@@ -25,18 +27,165 @@ const App = () => {
   const [textMessages, setTextMessages] = useState([]);
   const [streamUrl, setStreamUrl] = useState('');
 
-  // Dev Mode
-  const [devMode, setDevMode] = useState(false);
-  const [saveModalSource, setSaveModalSource] = useState(null); // 'current' or 'goal'
-
   useEffect(() => {
     if (config.SHOW_CAMERA) {
-      const topic = config.CAMERA_TOPIC;
-      // Use FastAPI proxy to bypass mixed-content blocker
-      const url = `/camera_stream?topic=${encodeURIComponent(topic)}`;
+      const topic = config.CAMERA_TOPIC || '/glass_detection/overlay';
+      const url = `${config.API_BASE_URL}/camera_stream?topic=${encodeURIComponent(topic)}`;
       setStreamUrl(url);
     }
   }, []);
+
+  // Dev Mode & Security States
+  const [devMode, setDevMode] = useState(false);
+  const [saveModalSource, setSaveModalSource] = useState(null); // 'current' or 'goal'
+
+  // Client Session & Pairing States
+  const [clientId] = useState(() => {
+    let id = localStorage.getItem("wheelchair_client_id");
+    if (!id) {
+      id = 'client_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+      localStorage.setItem("wheelchair_client_id", id);
+    }
+    return id;
+  });
+
+  const [sessionAllowed, setSessionAllowed] = useState(true);
+  const [sessionBlockedReason, setSessionBlockedReason] = useState('');
+
+  // Device Pairing & Dev Password Modals
+  const [isPaired, setIsPaired] = useState(() => !!localStorage.getItem("device_pairing_token"));
+  const [showPairingModal, setShowPairingModal] = useState(false);
+  const [pairingKeyInput, setPairingKeyInput] = useState('');
+  const [pairingMsg, setPairingMsg] = useState('');
+  const [verifyingPairing, setVerifyingPairing] = useState(false);
+
+  const [showDevPassModal, setShowDevPassModal] = useState(false);
+  const [devPassInput, setDevPassInput] = useState('');
+  const [devPassMsg, setDevPassMsg] = useState('');
+  const [verifyingDevPass, setVerifyingDevPass] = useState(false);
+  const [isDevAuthenticated, setIsDevAuthenticated] = useState(false);
+
+  // Session Heartbeat Polling
+  useEffect(() => {
+    const sendHeartbeat = async () => {
+      try {
+        const res = await fetch(`${config.API_BASE_URL}/session/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: clientId })
+        });
+        const data = await res.json();
+        if (data.allowed !== undefined) {
+          setSessionAllowed(data.allowed);
+          if (!data.allowed) {
+            setSessionBlockedReason(data.message || 'Maximum concurrent user limit reached.');
+          }
+        }
+      } catch (e) {
+        console.error("Heartbeat error:", e);
+      }
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 4000);
+
+    const handleBeforeUnload = () => {
+      navigator.sendBeacon(`${config.API_BASE_URL}/session/disconnect`, JSON.stringify({ client_id: clientId }));
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [clientId]);
+
+  // Check if Device Pairing Modal should be shown
+  useEffect(() => {
+    if (healthData?.enable_developer !== false) {
+      if (!localStorage.getItem("device_pairing_token")) {
+        setShowPairingModal(true);
+      } else {
+        setShowPairingModal(false);
+      }
+    } else {
+      setShowPairingModal(false);
+    }
+  }, [healthData]);
+
+  const handleVerifyPairing = async (e) => {
+    e.preventDefault();
+    if (!pairingKeyInput.trim()) {
+      setPairingMsg('❌ Please enter the Secret Device Pairing Key.');
+      return;
+    }
+    setVerifyingPairing(true);
+    setPairingMsg('');
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/device/verify_pairing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pairing_key: pairingKeyInput.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem("device_pairing_token", data.token);
+        setIsPaired(true);
+        setShowPairingModal(false);
+        setPairingKeyInput('');
+      } else {
+        setPairingMsg(`❌ ${data.message || 'Incorrect pairing key.'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setPairingMsg('❌ Error verifying pairing key.');
+    } finally {
+      setVerifyingPairing(false);
+    }
+  };
+
+  const handleVerifyDevPassword = async (e) => {
+    e.preventDefault();
+    if (!devPassInput) {
+      setDevPassMsg('❌ Please enter Developer Password.');
+      return;
+    }
+    setVerifyingDevPass(true);
+    setDevPassMsg('');
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/dev/verify_password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: devPassInput })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsDevAuthenticated(true);
+        setShowDevPassModal(false);
+        setDevPassInput('');
+        setCurrentScreen('dev');
+      } else {
+        setDevPassMsg(`❌ ${data.message || 'Incorrect password.'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setDevPassMsg('❌ Error verifying password.');
+    } finally {
+      setVerifyingDevPass(false);
+    }
+  };
+
+  const handleOpenDevDashboard = () => {
+    if (isDevAuthenticated || currentScreen === 'dev') {
+      if (currentScreen === 'dev') {
+        setCurrentScreen('welcome');
+      } else {
+        setCurrentScreen('dev');
+      }
+    } else {
+      setShowDevPassModal(true);
+    }
+  };
 
   // Setup speech synthesis
   useEffect(() => {
@@ -49,7 +198,9 @@ const App = () => {
   const speak = (text) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
+    // Replace underscores with spaces so TTS pronounces natural words (e.g. "wheelchair station bodh 105")
+    const cleanText = text ? text.replace(/_/g, ' ') : '';
+    const utt = new SpeechSynthesisUtterance(cleanText);
     utt.rate = 1.0; utt.pitch = 1.0; utt.volume = 1.0;
     const voices = window.speechSynthesis.getVoices();
     const eng = voices.find(v => v.lang.startsWith('en') && v.localService);
@@ -61,7 +212,7 @@ const App = () => {
   useEffect(() => {
     const pollHealth = async () => {
       try {
-        const res = await fetch('/health', { cache: 'no-store' });
+        const res = await fetch(`${config.API_BASE_URL}/health`, { cache: 'no-store' });
         const data = await res.json();
         setHealthData(data);
       } catch (err) {
@@ -89,7 +240,7 @@ const App = () => {
     updateStatus('ros', 'working', 'Stopping...');
 
     try {
-      await fetch('/stop', { 
+      await fetch(`${config.API_BASE_URL}/stop`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ devMode })
@@ -107,6 +258,86 @@ const App = () => {
   const goHome = () => {
     setCurrentScreen('home');
     resetStatus();
+  };
+
+  const startNavigation = async () => {
+    console.log("[App] startNavigation() called. API_BASE_URL =", config.API_BASE_URL);
+    try {
+      const url = `${config.API_BASE_URL}/start_navigation`;
+      console.log("[App] Fetching url:", url);
+      const res = await fetch(url, { method: 'POST' });
+      const data = await res.json();
+      console.log("[App] start_navigation response:", data);
+    } catch (err) {
+      console.error("[App] Failed to start navigation stack:", err);
+    }
+  };
+
+  const startIntelligence = async () => {
+    try {
+      await fetch(`${config.API_BASE_URL}/start_intelligence`, { method: 'POST' });
+    } catch (err) {
+      console.error("Failed to start intelligence stack:", err);
+    }
+  };
+
+  const shutdownNavigation = async () => {
+    const confirmShutdown = window.confirm("Are you sure you want to completely shutdown the navigation system? This will stop all sensors and return to the welcome screen.");
+    if (!confirmShutdown) return;
+
+    try {
+      setCurrentScreen('welcome');
+      await fetch(`${config.API_BASE_URL}/shutdown_navigation`, { method: 'POST' });
+    } catch (err) {
+      console.error("Failed to shutdown navigation stack:", err);
+    }
+  };
+
+  const setInitialPose = async (location) => {
+    try {
+      const response = await fetch(`${config.API_BASE_URL}/set_initial_pose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location })
+      });
+      const data = await response.json();
+      return data.status === 'success';
+    } catch (err) {
+      console.error("Failed to set initial pose:", err);
+      return false;
+    }
+  };
+
+  const handleEnterSystem = async () => {
+    if (healthData?.nav2_ready) {
+      setCurrentScreen('home');
+      return;
+    }
+    
+    // Start navigation stack
+    await startNavigation();
+    
+    // Wait until ready
+    let checkCount = 0;
+    const checkInterval = setInterval(async () => {
+      checkCount++;
+      try {
+        const res = await fetch(`${config.API_BASE_URL}/health`, { cache: 'no-store' });
+        const data = await res.json();
+        setHealthData(data);
+        if (data?.nav2_ready) {
+          clearInterval(checkInterval);
+          setCurrentScreen('home');
+        }
+      } catch (err) {
+        // Keep polling
+      }
+      if (checkCount > 30) { // Limit to 30 attempts (30s)
+        clearInterval(checkInterval);
+        alert("Navigation startup is taking longer than expected. Please verify your Jetson TMUX logs.");
+        setCurrentScreen('home'); // proceed anyway as fallback
+      }
+    }, 1000);
   };
 
   const addSystemBubble = (feedType, style, text, actionTag, timing = null, extra = {}) => {
@@ -172,7 +403,7 @@ const App = () => {
     // Used by Feed chips and StationsScreen
     updateStatus('llama', 'working', 'Processing...');
     try {
-      const res = await fetch('/generate', {
+      const res = await fetch(`${config.API_BASE_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, devMode })
@@ -220,30 +451,34 @@ const App = () => {
 
   return (
     <div className="shell">
-      <Header />
+      {currentScreen !== 'welcome' && <Header />}
       
-      <div style={{display: 'flex', gap: '10px', margin: '20px 20px 0 20px'}}>
-        <button className="stop-btn" style={{flex: 1, margin: 0}} onClick={emergencyStop}>
-          <span className="stop-icon">⬛</span>
-          STOP
-        </button>
-        <button 
-          onClick={() => setDevMode(!devMode)}
-          style={{
-            padding: '0 20px', 
-            background: devMode ? 'var(--accent)' : 'var(--surface2)',
-            color: devMode ? '#fff' : 'var(--text)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          {devMode ? 'Dev: ON' : 'Dev: OFF'}
-        </button>
-      </div>
+      {currentScreen !== 'welcome' && (
+        <div style={{display: 'flex', gap: '10px', margin: '20px 20px 0 20px'}}>
+          <button className="stop-btn" style={{flex: 1, margin: 0}} onClick={emergencyStop}>
+            <span className="stop-icon">⬛</span>
+            STOP
+          </button>
+          {healthData?.enable_developer !== false && (
+            <button 
+              onClick={handleOpenDevDashboard}
+              style={{
+                padding: '0 20px', 
+                background: currentScreen === 'dev' ? '#f39c12' : 'var(--surface2)',
+                color: currentScreen === 'dev' ? '#fff' : 'var(--text)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              {currentScreen === 'dev' ? '🛠️ Dev Mode: Active' : '🛠️ Dev Dashboard'}
+            </button>
+          )}
+        </div>
+      )}
 
-      {devMode && (
+      {currentScreen !== 'welcome' && currentScreen !== 'dev' && devMode && (
         <div className="dev-panel">
           <button onClick={() => setSaveModalSource('current')}>
             💾 Save Current Pose
@@ -257,29 +492,33 @@ const App = () => {
         </div>
       )}
 
-      <div className="status-bar">
-        {currentScreen !== 'text' && (
-          <div className={`status-pill ${status.whisper.state}`}>
-            <span className="sicon">🎙</span> {status.whisper.label}
-            {status.whisper.state === 'working' && <span className="spinner"></span>}
+      {currentScreen !== 'welcome' && (
+        <div className="status-bar">
+          {currentScreen !== 'text' && (
+            <div className={`status-pill ${status.whisper.state}`}>
+              <span className="sicon">🎙</span> {status.whisper.label}
+              {status.whisper.state === 'working' && <span className="spinner"></span>}
+            </div>
+          )}
+          <div className={`status-pill ${status.llama.state}`}>
+            <span className="sicon">🧠</span> {status.llama.label}
+            {status.llama.state === 'working' && <span className="spinner"></span>}
           </div>
-        )}
-        <div className={`status-pill ${status.llama.state}`}>
-          <span className="sicon">🧠</span> {status.llama.label}
-          {status.llama.state === 'working' && <span className="spinner"></span>}
+          <div className={`status-pill ${status.ros.state !== 'working' ? (healthData?.nav2_ready ? 'done' : 'err') : 'working'}`}>
+            <span className="sicon">📡</span> {status.ros.state === 'working' ? status.ros.label : (healthData?.nav2_ready ? 'ROS Ready' : 'ROS Offline')}
+            {status.ros.state === 'working' && <span className="spinner"></span>}
+          </div>
         </div>
-        <div className={`status-pill ${status.ros.state !== 'working' ? (healthData?.nav2_ready ? 'done' : 'err') : 'working'}`}>
-          <span className="sicon">📡</span> {status.ros.state === 'working' ? status.ros.label : (healthData?.nav2_ready ? 'ROS Ready' : 'ROS Offline')}
-          {status.ros.state === 'working' && <span className="spinner"></span>}
+      )}
+
+      {currentScreen !== 'welcome' && (
+        <div className={`health-badge ${badgeClass}`} style={{ width: 'fit-content', margin: '0 auto 10px auto', padding: '8px 16px', fontSize: '13px' }}>
+          <span className="dot"></span>
+          <span>{badgeText}</span>
         </div>
-      </div>
+      )}
 
-      <div className={`health-badge ${badgeClass}`} style={{ width: 'fit-content', margin: '0 auto 10px auto', padding: '8px 16px', fontSize: '13px' }}>
-        <span className="dot"></span>
-        <span>{badgeText}</span>
-      </div>
-
-      {healthData && typeof healthData.nav2_status !== 'undefined' && (
+      {currentScreen !== 'welcome' && healthData && typeof healthData.nav2_status !== 'undefined' && (
         <div className="nav2-banner">
           <div className="nav2-status">
             <strong>Status:</strong> {getNav2StatusText(healthData.nav2_status)}
@@ -299,8 +538,13 @@ const App = () => {
             alt="ROS Camera Stream" 
             className="camera-feed"
             onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'flex';
+              if (streamUrl.includes('/glass_detection/overlay')) {
+                const fallbackUrl = `${config.API_BASE_URL}/camera_stream?topic=${encodeURIComponent('/camera1/color/image_raw')}`;
+                setStreamUrl(fallbackUrl);
+              } else {
+                e.target.style.display = 'none';
+                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+              }
             }}
           />
           <div className="camera-error" style={{ display: 'none' }}>
@@ -311,7 +555,36 @@ const App = () => {
         </div>
       )}
 
-      {currentScreen === 'home' && <ModeSelection setScreen={setCurrentScreen} />}
+      {currentScreen === 'welcome' && (
+        <WelcomeScreen 
+          navReady={!!healthData?.nav2_ready}
+          onStart={handleEnterSystem}
+          healthData={healthData}
+          onSetInitialPose={setInitialPose}
+          setScreen={setCurrentScreen}
+          onOpenDev={handleOpenDevDashboard}
+        />
+      )}
+
+      {currentScreen === 'dev' && (
+        <DevScreen 
+          setScreen={setCurrentScreen}
+          healthData={healthData}
+          onShutdownNavigation={shutdownNavigation}
+          onStartNavigation={startNavigation}
+          onStartIntelligence={startIntelligence}
+          onSetInitialPose={setInitialPose}
+        />
+      )}
+
+      {currentScreen === 'home' && (
+        <ModeSelection 
+          setScreen={setCurrentScreen} 
+          healthData={healthData}
+          onStartNavigation={startNavigation}
+          onStartIntelligence={startIntelligence}
+        />
+      )}
       
       {currentScreen === 'voice' && (
         <VoiceScreen 
@@ -366,6 +639,103 @@ const App = () => {
             setSaveModalSource(null);
           }}
         />
+      )}
+
+      {/* 1. CONCURRENT USER LIMIT EXCEEDED MODAL */}
+      {!sessionAllowed && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 15, 20, 0.95)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid #e74c3c', borderRadius: 'var(--radius)', padding: '35px', maxWidth: '440px', width: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⛔</div>
+            <h3 style={{ color: '#e74c3c', margin: '0 0 12px 0', fontSize: '20px' }}>WHEELCHAIR SYSTEM BUSY</h3>
+            <p style={{ fontSize: '14px', color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+              {sessionBlockedReason || "Another device is currently controlling the wheelchair (Limit: 1 active user)."}
+            </p>
+            <div style={{ padding: '12px', background: 'var(--surface2)', borderRadius: 'var(--radius)', fontSize: '12px', color: 'var(--text-muted)' }}>
+              🔒 Controls are locked to prevent conflicting commands. Please wait for the active user to disconnect.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. DEVICE PAIRING MODAL */}
+      {showPairingModal && sessionAllowed && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 15, 20, 0.92)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid #3498db', borderRadius: 'var(--radius)', padding: '30px', maxWidth: '420px', width: '90%', textAlign: 'center' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📱</div>
+            <h3 style={{ color: '#3498db', margin: '0 0 8px 0', fontSize: '18px' }}>DEVICE AUTHORIZATION REQUIRED</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '20px' }}>
+              Enter the Secret Device Pairing Key to unlock controls on this device.
+            </p>
+            <form onSubmit={handleVerifyPairing} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <input 
+                type="password"
+                placeholder="Enter Secret Pairing Key"
+                value={pairingKeyInput}
+                onChange={(e) => setPairingKeyInput(e.target.value)}
+                style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '14px', textAlign: 'center' }}
+              />
+              <button 
+                type="submit"
+                disabled={verifyingPairing}
+                style={{ padding: '12px', background: 'linear-gradient(135deg, #2980b9, #3498db)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 600, cursor: verifyingPairing ? 'not-allowed' : 'pointer' }}
+              >
+                {verifyingPairing ? 'Verifying...' : '🔑 Authorize Device'}
+              </button>
+            </form>
+            {pairingMsg && (
+              <div style={{ marginTop: '14px', fontSize: '12px', color: pairingMsg.includes('❌') ? '#e74c3c' : '#2ecc71', fontWeight: 500 }}>
+                {pairingMsg}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. DEVELOPER MODE PASSWORD MODAL */}
+      {showDevPassModal && sessionAllowed && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 15, 20, 0.90)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid #f39c12', borderRadius: 'var(--radius)', padding: '30px', maxWidth: '400px', width: '90%', textAlign: 'center' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+            <h3 style={{ color: '#f39c12', margin: '0 0 8px 0', fontSize: '18px' }}>DEVELOPER AUTHENTICATION</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '20px' }}>
+              Enter Developer Password to access system settings.
+            </p>
+            <form onSubmit={handleVerifyDevPassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <input 
+                type="password"
+                placeholder="Developer Password"
+                value={devPassInput}
+                onChange={(e) => setDevPassInput(e.target.value)}
+                style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '14px', textAlign: 'center' }}
+              />
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowDevPassModal(false);
+                    setDevPassInput('');
+                    setDevPassMsg('');
+                  }}
+                  style={{ flex: 1, padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={verifyingDevPass}
+                  style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #f39c12, #e67e22)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 600, cursor: verifyingDevPass ? 'not-allowed' : 'pointer' }}
+                >
+                  {verifyingDevPass ? 'Checking...' : 'Unlock'}
+                </button>
+              </div>
+            </form>
+            {devPassMsg && (
+              <div style={{ marginTop: '14px', fontSize: '12px', color: devPassMsg.includes('❌') ? '#e74c3c' : '#2ecc71', fontWeight: 500 }}>
+                {devPassMsg}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,7 @@
 const config = {
   // The ROS2 topic name that your camera publishes images to.
   // Example: '/camera/color/image_raw' or '/image_raw'
-  CAMERA_TOPIC: '/camera/camera/color/image_raw',
+  CAMERA_TOPIC: '/glass_detection/overlay',
 
   // Set to true to display the camera feed globally on the UI, false to hide it
   SHOW_CAMERA: true,
@@ -15,7 +15,13 @@ const config = {
   
   // IP address of the Jetson (leave as empty string '' to auto-detect from browser window location)
   // If accessing from another device on the network, this will automatically use the Jetson's IP
-  VIDEO_SERVER_IP: '' 
+  VIDEO_SERVER_IP: '',
+
+  // Base URL of the backend API.
+  // Set to empty string '' to use relative paths (same host/port as frontend).
+  // Set to 'https://10.42.0.1:8443' or similar if running the frontend separately.
+  API_BASE_URL: ''
 };
 
 export default config;
+ 

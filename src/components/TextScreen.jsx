@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Feed from './Feed';
+import config from '../config';
 
 const TextScreen = ({ goHome, destination, handleResponse, setStatus, addSystemBubble, messages, sendPrompt, devMode, nav2Ready }) => {
   const [text, setText] = useState('');
@@ -20,7 +21,7 @@ const TextScreen = ({ goHome, destination, handleResponse, setStatus, addSystemB
     setStatus('llama', 'working', 'Processing...');
     
     try {
-      const res = await fetch('/generate', {
+      const res = await fetch(`${config.API_BASE_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: currentText, devMode })
