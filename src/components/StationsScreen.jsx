@@ -82,7 +82,7 @@ const StationsScreen = ({ goHome, destination, handleResponse, setStatus, addSys
                 }}
               >
                 <span style={{ fontSize: '24px' }}>📍</span>
-                <span style={{ textAlign: 'center', wordBreak: 'break-word' }}>{loc}</span>
+                <span style={{ textAlign: 'center', wordBreak: 'break-word', textTransform: 'capitalize' }}>{loc.replace(/_/g, ' ')}</span>
               </button>
             ))}
           </div>

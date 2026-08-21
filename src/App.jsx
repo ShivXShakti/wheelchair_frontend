@@ -198,7 +198,9 @@ const App = () => {
   const speak = (text) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
+    // Replace underscores with spaces so TTS pronounces natural words (e.g. "wheelchair station bodh 105")
+    const cleanText = text ? text.replace(/_/g, ' ') : '';
+    const utt = new SpeechSynthesisUtterance(cleanText);
     utt.rate = 1.0; utt.pitch = 1.0; utt.volume = 1.0;
     const voices = window.speechSynthesis.getVoices();
     const eng = voices.find(v => v.lang.startsWith('en') && v.localService);
