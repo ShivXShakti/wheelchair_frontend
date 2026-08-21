@@ -643,6 +643,75 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
         </div>
       </div>
 
+      {/* SECTION 6: LOCATION SERVICEABILITY MANAGER */}
+      <div className="status-panel" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '20px' }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#e74c3c' }}>🛑 LOCATION SERVICEABILITY MANAGER</h3>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          Enable or disable wheelchair navigation services for specific map locations. Disabled locations show ⛔ "Service Unavailable" and reject voice/text commands.
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
+          {locationNames.map((loc) => {
+            const isServiceable = healthData?.location_serviceability?.[loc] !== false;
+            return (
+              <div 
+                key={loc}
+                style={{
+                  padding: '12px 16px',
+                  background: isServiceable ? 'var(--surface2)' : 'rgba(231, 76, 60, 0.1)',
+                  border: `1px solid ${isServiceable ? 'var(--border)' : 'rgba(231, 76, 60, 0.4)'}`,
+                  borderRadius: 'var(--radius)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px'
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '13px', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {loc.replace(/_/g, ' ')}
+                  </div>
+                  <div style={{ fontSize: '10px', color: isServiceable ? '#2ecc71' : '#e74c3c', fontWeight: 600, marginTop: '2px' }}>
+                    {isServiceable ? '🟢 Serviceable' : '⛔ Service Unavailable'}
+                  </div>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    const nextStatus = !isServiceable;
+                    try {
+                      const res = await fetch(`${config.API_BASE_URL}/locations/toggle_serviceability`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ location: loc, serviceable: nextStatus })
+                      });
+                      const data = await res.json();
+                      if (data.status === 'success') {
+                        setActionMsg(`Location '${loc}' set to ${nextStatus ? 'SERVICEABLE' : 'UNSERVICEABLE (DISABLED)'}`);
+                      }
+                    } catch (e) {
+                      setActionMsg('Failed to toggle location serviceability');
+                    }
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    borderRadius: 'var(--radius)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: isServiceable ? 'linear-gradient(135deg, #c0392b, #e74c3c)' : 'linear-gradient(135deg, #27ae60, #2ecc71)',
+                    color: '#fff'
+                  }}
+                >
+                  {isServiceable ? 'Disable ⛔' : 'Enable 🟢'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* REBOOT CONFIRMATION MODAL */}
       {showRebootModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
