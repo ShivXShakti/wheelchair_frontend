@@ -8,6 +8,7 @@ import TeleopScreen from './components/TeleopScreen';
 import StationsScreen from './components/StationsScreen';
 import SaveLocationModal from './components/SaveLocationModal';
 import DevScreen from './components/DevScreen';
+import SummonScreen from './components/SummonScreen';
 import config from './config';
 
 const App = () => {
@@ -223,6 +224,44 @@ const App = () => {
     const interval = setInterval(pollHealth, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Arrival Tracker: Polls nav2_status and detects transition to 4 ("Reached Destination")
+  const [prevNav2Status, setPrevNav2Status] = useState(null);
+  const [showUseWheelchairModal, setShowUseWheelchairModal] = useState(false);
+  const [arrivedStationName, setArrivedStationName] = useState('');
+
+  useEffect(() => {
+    if (!healthData) return;
+    const currentStatus = healthData.nav2_status;
+    const isReached = (currentStatus === 4 || currentStatus === 'Reached Destination' || currentStatus === 'Reached destination');
+    const wasNotReached = (prevNav2Status !== null && prevNav2Status !== 4 && prevNav2Status !== 'Reached Destination' && prevNav2Status !== 'Reached destination');
+
+    if (isReached && wasNotReached) {
+      const locName = destination || 'destination';
+      if (currentScreen === 'summon') {
+        speak(`Reached ${locName}. Please press button to use wheelchair.`);
+        setArrivedStationName(locName);
+        setShowUseWheelchairModal(true);
+      } else {
+        speak(`Reached ${locName}`);
+      }
+    }
+    setPrevNav2Status(currentStatus);
+  }, [healthData?.nav2_status, currentScreen, destination, prevNav2Status]);
+
+  const handleUseWheelchairClick = () => {
+    speak("Please use wheelchair tab for further navigation.");
+    setShowUseWheelchairModal(false);
+    
+    // Disconnect session
+    try {
+      navigator.sendBeacon(`${config.API_BASE_URL}/session/disconnect`, JSON.stringify({ client_id: clientId }));
+    } catch(e) {}
+
+    // Return to Welcome Screen & reset states
+    setCurrentScreen('welcome');
+    setDestination(null);
+  };
 
   const updateStatus = (id, state, label) => {
     setStatus(prev => ({ ...prev, [id]: { state, label } }));
@@ -630,6 +669,20 @@ const App = () => {
         />
       )}
 
+      {currentScreen === 'summon' && (
+        <SummonScreen 
+          goHome={goHome}
+          destination={destination}
+          handleResponse={handleResponse}
+          setStatus={updateStatus}
+          addSystemBubble={(style, text, actionTag) => addSystemBubble('text', style, text, actionTag)}
+          sendPrompt={executePrompt}
+          healthData={healthData}
+          onStartNavigation={startNavigation}
+          speak={speak}
+        />
+      )}
+
       {saveModalSource && (
         <SaveLocationModal 
           source={saveModalSource}
@@ -639,6 +692,39 @@ const App = () => {
             setSaveModalSource(null);
           }}
         />
+      )}
+
+      {/* USE WHEELCHAIR ARRIVAL DISCONNECT MODAL */}
+      {showUseWheelchairModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 15, 20, 0.95)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
+          <div style={{ background: 'var(--surface)', border: '2px solid #2ecc71', borderRadius: 'var(--radius)', padding: '35px', maxWidth: '440px', width: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: '54px', marginBottom: '16px' }}>🦽</div>
+            <h3 style={{ color: '#2ecc71', margin: '0 0 12px 0', fontSize: '22px', fontWeight: 700 }}>
+              WHEELCHAIR HAS ARRIVED!
+            </h3>
+            <p style={{ fontSize: '15px', color: 'var(--text)', lineHeight: '1.6', margin: '0 0 24px 0' }}>
+              The wheelchair has arrived at <strong>{arrivedStationName.replace(/_/g, ' ')}</strong>. Please press the button below to start using the wheelchair.
+            </p>
+            <button
+              onClick={handleUseWheelchairClick}
+              style={{
+                width: '100%',
+                padding: '16px 24px',
+                fontSize: '18px',
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #2ecc71, #27ae60)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius)',
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(46, 204, 113, 0.4)',
+                transition: 'transform 0.2s'
+              }}
+            >
+              ♿ Use Wheelchair
+            </button>
+          </div>
+        </div>
       )}
 
       {/* 1. CONCURRENT USER LIMIT EXCEEDED MODAL */}

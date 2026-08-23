@@ -105,7 +105,7 @@ const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose, setScr
             fontSize: '16px',
             fontWeight: 600,
             background: loading ? 'var(--surface2)' : 'linear-gradient(135deg, var(--accent) 0%, #3a7bd5 100%)',
-            color: '#white',
+            color: '#fff',
             border: 'none',
             borderRadius: 'var(--radius)',
             cursor: loading ? 'not-allowed' : 'pointer',
@@ -123,10 +123,33 @@ const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose, setScr
               Launching Navigation...
             </>
           ) : navReady ? (
-            'Enter System'
+            'Enter On-Board System'
           ) : (
             'Start Navigation System'
           )}
+        </button>
+
+        <button 
+          onClick={() => setScreen('summon')}
+          style={{
+            width: '100%',
+            marginTop: '12px',
+            padding: '14px 24px',
+            fontSize: '15px',
+            fontWeight: 600,
+            background: 'linear-gradient(135deg, #9b59b6, #8e44ad)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 'var(--radius)',
+            cursor: 'pointer',
+            boxShadow: '0 4px 15px rgba(155, 89, 182, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          🎺 Summon Wheelchair (Mobile)
         </button>
 
         <div style={{ marginTop: '24px', fontSize: '13px', color: 'var(--text-muted)' }}>
