@@ -263,14 +263,14 @@ const App = () => {
   const [arrivedStationName, setArrivedStationName] = useState('');
 
   useEffect(() => {
-    if (!healthData) return;
+    if (!healthData || currentScreen === 'summon_disconnected') return;
     const currentStatus = healthData.nav2_status;
     const isReached = isStatusReached(currentStatus);
     const wasNotReached = !isStatusReached(prevNav2Status);
 
     if (isReached && wasNotReached) {
       const locName = destination || healthData?.last_destination || arrivedStationName || 'destination';
-      const isSummonUser = (currentScreen === 'summon' || !localStorage.getItem("device_pairing_token"));
+      const isSummonUser = (currentScreen === 'summon' && !localStorage.getItem("device_pairing_token"));
       if (isSummonUser) {
         speak(`Reached ${locName}. Please press button to use wheelchair.`);
         setArrivedStationName(locName);
