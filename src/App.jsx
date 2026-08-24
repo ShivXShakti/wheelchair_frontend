@@ -236,6 +236,19 @@ const App = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Helper to check if a nav status value indicates arrival / destination reached
+  const isStatusReached = (statusVal) => {
+    if (!statusVal || statusVal === 'Unknown' || statusVal === 'Idle') return false;
+    if (statusVal === 4) return true;
+    let str = '';
+    if (typeof statusVal === 'object') {
+      str = JSON.stringify(statusVal).toLowerCase();
+    } else {
+      str = String(statusVal).toLowerCase();
+    }
+    return str.includes('reached') || str.includes('succeeded') || str.includes('status 4') || str.includes('"status": 4') || str.includes('"status": "reached"') || str.includes('"status":"reached"') || str.includes('arrived');
+  };
+
   // Arrival Tracker: Polls nav2_status and detects transition to 4 ("Reached Destination")
   const [prevNav2Status, setPrevNav2Status] = useState(null);
   const [showUseWheelchairModal, setShowUseWheelchairModal] = useState(false);
@@ -244,12 +257,13 @@ const App = () => {
   useEffect(() => {
     if (!healthData) return;
     const currentStatus = healthData.nav2_status;
-    const isReached = (currentStatus === 4 || currentStatus === 'Reached Destination' || currentStatus === 'Reached destination');
-    const wasNotReached = (prevNav2Status !== null && prevNav2Status !== 4 && prevNav2Status !== 'Reached Destination' && prevNav2Status !== 'Reached destination');
+    const isReached = isStatusReached(currentStatus);
+    const wasNotReached = !isStatusReached(prevNav2Status);
 
     if (isReached && wasNotReached) {
-      const locName = destination || 'destination';
-      if (currentScreen === 'summon') {
+      const locName = destination || healthData?.last_destination || arrivedStationName || 'destination';
+      const isSummonUser = (currentScreen === 'summon' || !localStorage.getItem("device_pairing_token"));
+      if (isSummonUser) {
         speak(`Reached ${locName}. Please press button to use wheelchair.`);
         setArrivedStationName(locName);
         setShowUseWheelchairModal(true);
@@ -258,7 +272,7 @@ const App = () => {
       }
     }
     setPrevNav2Status(currentStatus);
-  }, [healthData?.nav2_status, currentScreen, destination, prevNav2Status]);
+  }, [healthData?.nav2_status, currentScreen, destination, prevNav2Status, arrivedStationName, healthData?.last_destination]);
 
   const handleUseWheelchairClick = () => {
     speak("Please use wheelchair tab for further navigation.");
