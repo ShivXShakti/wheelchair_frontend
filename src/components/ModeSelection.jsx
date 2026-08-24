@@ -88,7 +88,7 @@ const ModeSelection = ({ setScreen, healthData, onStartNavigation, onStartIntell
       {healthData?.usage_state === 'in_use' && isPaired && (
         <div style={{ background: 'linear-gradient(135deg, rgba(39, 174, 96, 0.15), rgba(46, 204, 113, 0.25))', border: '2px solid #2ecc71', borderRadius: 'var(--radius)', padding: '18px', textAlign: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
           <div style={{ fontSize: '20px', fontWeight: 800, color: '#2ecc71', marginBottom: '6px' }}>
-            🚩 Wheelchair Arrived at Station!
+            🚩 Wheelchair Arrived at {(healthData?.active_summon_station || healthData?.last_destination || 'Station').replace(/_/g, ' ')}!
           </div>
           <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '16px', lineHeight: 1.5 }}>
             Do you want to proceed further with navigation to another location?

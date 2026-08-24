@@ -276,7 +276,16 @@ const App = () => {
         setArrivedStationName(locName);
         setShowUseWheelchairModal(true);
       } else {
-        speak(`Reached ${locName}`);
+        speak(`Reached ${locName}. Do you want to proceed further to another location?`);
+        setArrivedStationName(locName);
+        setCurrentScreen('home');
+        try {
+          fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: 'in_use', station: locName })
+          });
+        } catch(e) {}
       }
     }
     setPrevNav2Status(currentStatus);
