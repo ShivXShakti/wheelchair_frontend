@@ -69,15 +69,23 @@ const App = () => {
   useEffect(() => {
     const sendHeartbeat = async () => {
       try {
+        const token = localStorage.getItem("device_pairing_token") || "";
         const res = await fetch(`${config.API_BASE_URL}/session/heartbeat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ client_id: clientId })
+          body: JSON.stringify({ 
+            client_id: clientId,
+            is_paired: isPaired || !!token,
+            pairing_token: token
+          })
         });
         const data = await res.json();
         if (data.allowed !== undefined) {
-          setSessionAllowed(data.allowed);
-          if (!data.allowed) {
+          const allowed = data.allowed || isPaired || !!token;
+          setSessionAllowed(allowed);
+          if (allowed) {
+            setSessionBlockedReason(null);
+          } else {
             setSessionBlockedReason(data.message || 'Maximum concurrent user limit reached.');
           }
         }
