@@ -18,9 +18,9 @@ const SummonScreen = ({
   const [isSending, setIsSending] = useState(false);
   const [launchingNav, setLaunchingNav] = useState(false);
 
-  const navReady = !!healthData?.nav2_ready;
-  // Display all locations / stations from loaded map semantics
-  const stations = healthData?.location_names || healthData?.wheelchair_stations || [];
+  const usageState = healthData?.usage_state || 'ready_to_summon';
+  const activeStation = healthData?.active_summon_station || destination || '';
+  const isBusy = (usageState === 'in_use' || usageState === 'summoning') && !isPaired;
 
   const handleStartNav = async () => {
     setLaunchingNav(true);
@@ -33,12 +33,47 @@ const SummonScreen = ({
       alert("Wheelchair navigation is not ready yet. Please wait for status to show Ready.");
       return;
     }
+    if (isBusy) {
+      alert("Wheelchair is currently in use or summoning by another rider.");
+      return;
+    }
 
     setIsSending(true);
+    // Lock wheelchair usage state on backend to summoning
+    try {
+      await fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'summoning', station: stationName })
+      });
+    } catch(e) {}
+
     const prompt = `take me to ${stationName}`;
     await sendPrompt(prompt, 'text');
     setIsSending(false);
   };
+
+  // Render Clean Disconnected Screen after user clicks "Use Wheelchair"
+  if (healthData?.isDisconnected) {
+    return (
+      <div className="screen active" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', maxWidth: '500px', margin: '0 auto', minHeight: '80vh' }}>
+        <div style={{ fontSize: '72px', marginBottom: '16px' }}>♿</div>
+        <h2 style={{ fontSize: '26px', color: 'var(--accent)', marginBottom: '12px', fontWeight: 800 }}>Wheelchair Activated!</h2>
+        <div style={{ background: 'rgba(39, 174, 96, 0.15)', border: '1px solid #2ecc71', color: '#2ecc71', padding: '14px', borderRadius: 'var(--radius)', marginBottom: '20px', fontWeight: 600, fontSize: '14px' }}>
+          🎉 You have arrived at your wheelchair. Please use the mounted touchscreen tablet on board for further navigation!
+        </div>
+        <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '28px' }}>
+          This summoning session has completed. Once your ride is finished, the wheelchair will automatically unlock for future summoners.
+        </p>
+        <button 
+          onClick={() => window.location.reload()}
+          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #2980b9, #3498db)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 700, cursor: 'pointer', fontSize: '15px' }}
+        >
+          🔄 New Session / Reconnect
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="screen active" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px', maxWidth: '650px', margin: '0 auto', width: '100%' }}>
@@ -75,6 +110,25 @@ const SummonScreen = ({
           </span>
         </div>
       </div>
+
+      {/* Usage Lock Banners */}
+      {usageState === 'in_use' && !isPaired && (
+        <div style={{ background: 'rgba(231, 76, 60, 0.15)', border: '2px solid #e74c3c', color: '#e74c3c', padding: '14px', borderRadius: 'var(--radius)', textAlign: 'center', marginBottom: '16px', fontWeight: 700 }}>
+          ⛔ WHEELCHAIR CURRENTLY IN USE
+          <div style={{ fontSize: '12px', fontWeight: 500, marginTop: '4px', opacity: 0.9 }}>
+            Another rider is currently using the wheelchair. Summoning is disabled until the current ride is finished.
+          </div>
+        </div>
+      )}
+
+      {usageState === 'summoning' && !isPaired && (
+        <div style={{ background: 'rgba(243, 156, 18, 0.15)', border: '2px solid #f39c12', color: '#f39c12', padding: '14px', borderRadius: 'var(--radius)', textAlign: 'center', marginBottom: '16px', fontWeight: 700 }}>
+          🚕 WHEELCHAIR SUMMONING IN PROGRESS
+          <div style={{ fontSize: '12px', fontWeight: 500, marginTop: '4px', opacity: 0.9 }}>
+            Wheelchair is navigating to: <strong>{activeStation || 'Station'}</strong>
+          </div>
+        </div>
+      )}
 
       {/* Live Camera Stream Feed */}
       {streamUrl && (
@@ -164,7 +218,7 @@ const SummonScreen = ({
               return (
                 <button
                   key={idx}
-                  disabled={isSending || !navReady || !isServiceable}
+                  disabled={isSending || !navReady || !isServiceable || isBusy}
                   onClick={() => handleSummonClick(st)}
                   style={{
                     background: isServiceable ? 'var(--surface2)' : 'rgba(231, 76, 60, 0.08)',
@@ -174,12 +228,12 @@ const SummonScreen = ({
                     color: isServiceable ? 'var(--text)' : 'var(--text-muted)',
                     fontSize: '15px',
                     fontWeight: 600,
-                    cursor: (!navReady || isSending || !isServiceable) ? 'not-allowed' : 'pointer',
+                    cursor: (!navReady || isSending || !isServiceable || isBusy) ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '10px',
-                    opacity: (navReady && isServiceable) ? 1 : 0.6,
+                    opacity: (navReady && isServiceable && !isBusy) ? 1 : 0.5,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     transition: 'transform 0.2s, border-color 0.2s'
                   }}

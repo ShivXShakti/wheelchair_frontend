@@ -110,7 +110,7 @@ const App = () => {
 
   // Check if Device Pairing Modal should be shown (Only for full on-board system access)
   useEffect(() => {
-    if (currentScreen === 'summon') {
+    if (currentScreen === 'summon' || currentScreen === 'summon_disconnected') {
       setShowPairingModal(false);
       return;
     }
@@ -274,18 +274,38 @@ const App = () => {
     setPrevNav2Status(currentStatus);
   }, [healthData?.nav2_status, currentScreen, destination, prevNav2Status, arrivedStationName, healthData?.last_destination]);
 
-  const handleUseWheelchairClick = () => {
+  const handleUseWheelchairClick = async () => {
     speak("Please use wheelchair tab for further navigation.");
     setShowUseWheelchairModal(false);
     
-    // Disconnect session
+    // Set wheelchair usage state to in_use on backend
+    try {
+      await fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'in_use', station: arrivedStationName || destination || '' })
+      });
+    } catch(e) {}
+
+    // Disconnect session beacon
     try {
       navigator.sendBeacon(`${config.API_BASE_URL}/session/disconnect`, JSON.stringify({ client_id: clientId }));
     } catch(e) {}
 
-    // Return to Welcome Screen & reset states
-    setCurrentScreen('welcome');
+    // Transition mobile summoner to clean summon_disconnected screen
+    setCurrentScreen('summon_disconnected');
     setDestination(null);
+  };
+
+  const handleReleaseWheelchair = async () => {
+    try {
+      await fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'ready_to_summon', station: '' })
+      });
+    } catch(e) {}
+    speak("Wheelchair released and ready for new summoning.");
   };
 
   const updateStatus = (id, state, label) => {
@@ -647,6 +667,8 @@ const App = () => {
           healthData={healthData}
           onStartNavigation={startNavigation}
           onStartIntelligence={startIntelligence}
+          onReleaseWheelchair={handleReleaseWheelchair}
+          isPaired={isPaired}
         />
       )}
       
@@ -694,7 +716,7 @@ const App = () => {
         />
       )}
 
-      {currentScreen === 'summon' && (
+      {(currentScreen === 'summon' || currentScreen === 'summon_disconnected') && (
         <SummonScreen 
           goHome={goHome}
           destination={destination}
@@ -702,7 +724,7 @@ const App = () => {
           setStatus={updateStatus}
           addSystemBubble={(style, text, actionTag) => addSystemBubble('text', style, text, actionTag)}
           sendPrompt={executePrompt}
-          healthData={healthData}
+          healthData={{ ...healthData, isDisconnected: currentScreen === 'summon_disconnected' }}
           onStartNavigation={startNavigation}
           speak={speak}
           streamUrl={streamUrl}
