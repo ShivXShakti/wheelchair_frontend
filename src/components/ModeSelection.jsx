@@ -73,7 +73,7 @@ const ModeSelection = ({ setScreen, healthData, onStartNavigation, onStartIntell
             <div className="mode-desc">Type a command</div>
           </div>
           <div className="mode-card" onClick={() => setScreen('stations')}>
-            <div className="mode-icon">📍</div>
+            <div className="mode-icon">🦽</div>
             <div className="mode-label">Stations</div>
             <div className="mode-desc">Select destination</div>
           </div>
