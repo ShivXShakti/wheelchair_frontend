@@ -18,9 +18,12 @@ const SummonScreen = ({
   const [isSending, setIsSending] = useState(false);
   const [launchingNav, setLaunchingNav] = useState(false);
 
+  const navReady = !!healthData?.nav2_ready;
   const usageState = healthData?.usage_state || 'ready_to_summon';
   const activeStation = healthData?.active_summon_station || destination || '';
   const isBusy = (usageState === 'in_use' || usageState === 'summoning') && !isPaired;
+  // Display all locations / stations from loaded map semantics
+  const stations = healthData?.location_names || healthData?.wheelchair_stations || [];
 
   const handleStartNav = async () => {
     setLaunchingNav(true);
