@@ -581,7 +581,7 @@ const App = () => {
         </div>
       )}
 
-      {config.SHOW_CAMERA && streamUrl && (
+      {config.SHOW_CAMERA && streamUrl && currentScreen !== 'summon' && (
         <div className="camera-container" style={{ marginBottom: '20px' }}>
           <img 
             src={streamUrl} 
@@ -693,6 +693,7 @@ const App = () => {
           speak={speak}
           streamUrl={streamUrl}
           isPaired={isPaired}
+          onOpenPairingModal={() => setShowPairingModal(true)}
         />
       )}
 

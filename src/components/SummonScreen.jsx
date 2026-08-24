@@ -12,7 +12,8 @@ const SummonScreen = ({
   onStartNavigation,
   speak,
   streamUrl,
-  isPaired
+  isPaired,
+  onOpenPairingModal
 }) => {
   const [isSending, setIsSending] = useState(false);
   const [launchingNav, setLaunchingNav] = useState(false);
@@ -41,13 +42,33 @@ const SummonScreen = ({
 
   return (
     <div className="screen active" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px', maxWidth: '650px', margin: '0 auto', width: '100%' }}>
-      <div className="screen-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        {isPaired && (
+      <div className="screen-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        {isPaired ? (
           <button className="back-btn" onClick={goHome} style={{ padding: '8px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>
             ← Exit Summon Mode
           </button>
+        ) : (
+          <button 
+            onClick={onOpenPairingModal} 
+            style={{ 
+              padding: '6px 14px', 
+              fontSize: '12px', 
+              background: 'rgba(52, 152, 219, 0.15)', 
+              border: '1px solid #3498db', 
+              borderRadius: 'var(--radius)', 
+              color: '#3498db', 
+              cursor: 'pointer', 
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            🔑 Authorize Full Access
+          </button>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isPaired ? 'auto' : '100%', justifyContent: 'center' }}>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: isPaired ? 'flex-end' : 'center' }}>
           <img src="/static/ihublogo.svg" alt="iHub Logo" style={{ height: '28px' }} />
           <span className="screen-title" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>
             🎺 Wheelchair Summoning Portal
