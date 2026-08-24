@@ -19,8 +19,8 @@ const SummonScreen = ({
   const [launchingNav, setLaunchingNav] = useState(false);
 
   const navReady = !!healthData?.nav2_ready;
-  // Extract stations tagged as wheelchair stations
-  const stations = healthData?.wheelchair_stations || healthData?.location_names || [];
+  // Display all locations / stations from loaded map semantics
+  const stations = healthData?.location_names || healthData?.wheelchair_stations || [];
 
   const handleStartNav = async () => {
     setLaunchingNav(true);
