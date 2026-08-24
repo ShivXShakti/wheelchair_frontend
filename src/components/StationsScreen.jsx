@@ -90,7 +90,7 @@ const StationsScreen = ({ goHome, destination, handleResponse, setStatus, addSys
                     }
                   }}
                 >
-                  <span style={{ fontSize: '24px' }}>{isServiceable ? '📍' : '⛔'}</span>
+                  <span style={{ fontSize: '28px' }}>{isServiceable ? '🦽' : '⛔'}</span>
                   <span style={{ textAlign: 'center', wordBreak: 'break-word', textTransform: 'capitalize' }}>{loc.replace(/_/g, ' ')}</span>
                   {!isServiceable && (
                     <span style={{ fontSize: '10px', color: '#e74c3c', background: 'rgba(231, 76, 60, 0.15)', padding: '2px 6px', borderRadius: '4px', marginTop: '2px' }}>
