@@ -12,7 +12,6 @@ import SummonScreen from './components/SummonScreen';
 import config from './config';
 
 const App = () => {
-  const [currentScreen, setCurrentScreen] = useState('welcome');
   const [healthData, setHealthData] = useState(null);
   const [destination, setDestination] = useState(null);
   
@@ -101,8 +100,20 @@ const App = () => {
     };
   }, [clientId]);
 
-  // Check if Device Pairing Modal should be shown
+  const [currentScreen, setCurrentScreen] = useState(() => {
+    // If URL has ?mode=summon or if device is not paired, go straight to summon screen!
+    if (window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
+      return 'summon';
+    }
+    return 'welcome';
+  });
+
+  // Check if Device Pairing Modal should be shown (Only for full on-board system access)
   useEffect(() => {
+    if (currentScreen === 'summon') {
+      setShowPairingModal(false);
+      return;
+    }
     if (healthData?.enable_developer !== false) {
       if (!localStorage.getItem("device_pairing_token")) {
         setShowPairingModal(true);
@@ -112,7 +123,7 @@ const App = () => {
     } else {
       setShowPairingModal(false);
     }
-  }, [healthData]);
+  }, [healthData, currentScreen]);
 
   const handleVerifyPairing = async (e) => {
     e.preventDefault();
@@ -490,9 +501,9 @@ const App = () => {
 
   return (
     <div className="shell">
-      {currentScreen !== 'welcome' && <Header />}
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && <Header />}
       
-      {currentScreen !== 'welcome' && (
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && (
         <div style={{display: 'flex', gap: '10px', margin: '20px 20px 0 20px'}}>
           <button className="stop-btn" style={{flex: 1, margin: 0}} onClick={emergencyStop}>
             <span className="stop-icon">⬛</span>
@@ -517,7 +528,7 @@ const App = () => {
         </div>
       )}
 
-      {currentScreen !== 'welcome' && currentScreen !== 'dev' && devMode && (
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && currentScreen !== 'dev' && devMode && (
         <div className="dev-panel">
           <button onClick={() => setSaveModalSource('current')}>
             💾 Save Current Pose
@@ -531,7 +542,7 @@ const App = () => {
         </div>
       )}
 
-      {currentScreen !== 'welcome' && (
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && (
         <div className="status-bar">
           {currentScreen !== 'text' && (
             <div className={`status-pill ${status.whisper.state}`}>
@@ -680,6 +691,8 @@ const App = () => {
           healthData={healthData}
           onStartNavigation={startNavigation}
           speak={speak}
+          streamUrl={streamUrl}
+          isPaired={isPaired}
         />
       )}
 

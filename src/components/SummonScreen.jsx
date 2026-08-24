@@ -10,7 +10,9 @@ const SummonScreen = ({
   sendPrompt, 
   healthData,
   onStartNavigation,
-  speak
+  speak,
+  streamUrl,
+  isPaired
 }) => {
   const [isSending, setIsSending] = useState(false);
   const [launchingNav, setLaunchingNav] = useState(false);
@@ -38,15 +40,40 @@ const SummonScreen = ({
   };
 
   return (
-    <div className="screen active" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+    <div className="screen active" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px', maxWidth: '650px', margin: '0 auto', width: '100%' }}>
       <div className="screen-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <button className="back-btn" onClick={goHome} style={{ padding: '8px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>
-          ← Exit Summon Mode
-        </button>
-        <span className="screen-title" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>
-          🎺 Summon Wheelchair
-        </span>
+        {isPaired && (
+          <button className="back-btn" onClick={goHome} style={{ padding: '8px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>
+            ← Exit Summon Mode
+          </button>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isPaired ? 'auto' : '100%', justifyContent: 'center' }}>
+          <img src="/static/ihublogo.svg" alt="iHub Logo" style={{ height: '28px' }} />
+          <span className="screen-title" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>
+            🎺 Wheelchair Summoning Portal
+          </span>
+        </div>
       </div>
+
+      {/* Live Camera Stream Feed */}
+      {streamUrl && (
+        <div className="camera-container" style={{ marginBottom: '18px', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+          <img 
+            src={streamUrl} 
+            alt="Wheelchair Live Camera Feed" 
+            className="camera-feed"
+            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '240px', objectFit: 'cover' }}
+            onError={(e) => {
+              if (streamUrl.includes('/glass_detection/overlay')) {
+                const fallbackUrl = `${config.API_BASE_URL}/camera_stream?topic=${encodeURIComponent('/camera1/color/image_raw')}`;
+                e.target.src = fallbackUrl;
+              } else {
+                e.target.style.display = 'none';
+              }
+            }}
+          />
+        </div>
+      )}
 
       {/* Navigation In Progress Banner */}
       {destination && (
