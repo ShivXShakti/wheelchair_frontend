@@ -13,7 +13,9 @@ const SummonScreen = ({
   speak,
   streamUrl,
   isPaired,
-  onOpenPairingModal
+  onOpenPairingModal,
+  sessionAllowed = true,
+  sessionBlockedReason = ''
 }) => {
   const [isSending, setIsSending] = useState(false);
   const [launchingNav, setLaunchingNav] = useState(false);
@@ -22,6 +24,7 @@ const SummonScreen = ({
   const usageState = healthData?.usage_state || 'ready_to_summon';
   const activeStation = healthData?.active_summon_station || destination || '';
   const isBusy = (usageState === 'in_use' || usageState === 'summoning') && !isPaired;
+  const isLocked = isBusy || !sessionAllowed || usageState === 'summon_cancelled';
   // Display all locations / stations from loaded map semantics
   const stations = healthData?.location_names || healthData?.wheelchair_stations || [];
 
@@ -32,6 +35,10 @@ const SummonScreen = ({
   };
 
   const handleSummonClick = async (stationName) => {
+    if (!sessionAllowed) {
+      alert(sessionBlockedReason || "Wheelchair system busy. Another mobile user is currently connected.");
+      return;
+    }
     if (!navReady) {
       alert("Wheelchair navigation is not ready yet. Please wait for status to show Ready.");
       return;
@@ -230,6 +237,27 @@ const SummonScreen = ({
         )}
       </div>
 
+      {/* Summon Cancelled Status Banner */}
+      {usageState === 'summon_cancelled' && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(230, 126, 34, 0.2), rgba(211, 84, 0, 0.3))',
+          border: '2px solid #e67e22',
+          borderRadius: 'var(--radius)',
+          padding: '18px',
+          marginBottom: '20px',
+          textAlign: 'center',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+        }}>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+          <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#f39c12', fontWeight: 800 }}>
+            SUMMONING GOAL CANCELLED
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+            The wheelchair operator cancelled the summoning trip. Please wait for the wheelchair to be reset.
+          </p>
+        </div>
+      )}
+
       {/* Available Wheelchair Stations List */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <h4 style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -247,7 +275,7 @@ const SummonScreen = ({
               return (
                 <button
                   key={idx}
-                  disabled={isSending || !navReady || !isServiceable || isBusy}
+                  disabled={isSending || !navReady || !isServiceable || isLocked}
                   onClick={() => handleSummonClick(st)}
                   style={{
                     background: isServiceable ? 'var(--surface2)' : 'rgba(231, 76, 60, 0.08)',
@@ -257,12 +285,12 @@ const SummonScreen = ({
                     color: isServiceable ? 'var(--text)' : 'var(--text-muted)',
                     fontSize: '15px',
                     fontWeight: 600,
-                    cursor: (!navReady || isSending || !isServiceable || isBusy) ? 'not-allowed' : 'pointer',
+                    cursor: (!navReady || isSending || !isServiceable || isLocked) ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '10px',
-                    opacity: (navReady && isServiceable && !isBusy) ? 1 : 0.5,
+                    opacity: (navReady && isServiceable && !isLocked) ? 1 : 0.5,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     transition: 'transform 0.2s, border-color 0.2s'
                   }}

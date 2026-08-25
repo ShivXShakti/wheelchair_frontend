@@ -811,6 +811,8 @@ const App = () => {
           streamUrl={streamUrl}
           isPaired={isPaired}
           onOpenPairingModal={() => setShowPairingModal(true)}
+          sessionAllowed={sessionAllowed}
+          sessionBlockedReason={sessionBlockedReason}
         />
       )}
 
@@ -1049,6 +1051,91 @@ const App = () => {
                 }}
               >
                 🛑 NO (Finish Ride / Release)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. AUTHORIZED OPERATOR MODAL FOR CANCELLED SUMMON */}
+      {healthData?.usage_state === 'summon_cancelled' && isPaired && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(10, 15, 30, 0.88)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <div 
+            style={{
+              background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+              border: '2px solid #f39c12',
+              borderRadius: '24px',
+              padding: '32px 24px',
+              maxWidth: '480px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+            }}
+          >
+            <div style={{ fontSize: '64px', marginBottom: '16px' }}>⚠️</div>
+            <h2 style={{ fontSize: '22px', color: '#f39c12', fontWeight: 800, marginBottom: '12px' }}>
+              Summoning Trip Cancelled
+            </h2>
+            <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.6, marginBottom: '28px' }}>
+              The current summoning trip was stopped. Please select how to update the wheelchair state:
+            </p>
+
+            <div style={{ display: 'flex', gap: '14px', flexDirection: 'column' }}>
+              <button 
+                onClick={handleReleaseWheelchair}
+                style={{ 
+                  padding: '16px', 
+                  background: 'linear-gradient(135deg, #27ae60, #2ecc71)', 
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '14px', 
+                  fontWeight: 800, 
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(46, 204, 113, 0.4)'
+                }}
+              >
+                🔄 Ready to Summon (Free for mobile users)
+              </button>
+              
+              <button 
+                onClick={async () => {
+                  try {
+                    await fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ state: 'in_use', station: '' })
+                    });
+                  } catch(e) {}
+                }}
+                style={{ 
+                  padding: '14px', 
+                  background: 'linear-gradient(135deg, #2980b9, #3498db)', 
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '14px', 
+                  fontWeight: 700, 
+                  fontSize: '15px',
+                  cursor: 'pointer'
+                }}
+              >
+                🦽 Use for Navigation (Tablet rider)
               </button>
             </div>
           </div>
