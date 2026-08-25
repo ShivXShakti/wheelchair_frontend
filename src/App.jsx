@@ -257,10 +257,47 @@ const App = () => {
     return str.includes('reached') || str.includes('succeeded') || str.includes('status 4') || str.includes('"status": 4') || str.includes('"status": "reached"') || str.includes('"status":"reached"') || str.includes('arrived');
   };
 
-  // Arrival Tracker: Polls nav2_status and detects transition to 4 ("Reached Destination")
+  // Arrival Tracker & Rider Continuation Modal
   const [prevNav2Status, setPrevNav2Status] = useState(null);
   const [showUseWheelchairModal, setShowUseWheelchairModal] = useState(false);
   const [arrivedStationName, setArrivedStationName] = useState('');
+  const [showArrivalContinuationModal, setShowArrivalContinuationModal] = useState(false);
+  const [arrivedGoalName, setArrivedGoalName] = useState('');
+  const [countdownSeconds, setCountdownSeconds] = useState(10);
+
+  // 10-Second Auto-Timeout for Arrival Continuation Modal
+  useEffect(() => {
+    let timer = null;
+    if (showArrivalContinuationModal) {
+      setCountdownSeconds(10);
+      timer = setInterval(() => {
+        setCountdownSeconds((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            // Timeout expired! Auto-release wheelchair state to ready_to_summon
+            handleReleaseWheelchair();
+            setShowArrivalContinuationModal(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCountdownSeconds(10);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showArrivalContinuationModal]);
+
+  const handleContinuationYes = () => {
+    setShowArrivalContinuationModal(false);
+  };
+
+  const handleContinuationNo = async () => {
+    setShowArrivalContinuationModal(false);
+    await handleReleaseWheelchair();
+  };
 
   useEffect(() => {
     if (!healthData || currentScreen === 'summon_disconnected') return;
@@ -277,7 +314,9 @@ const App = () => {
         setShowUseWheelchairModal(true);
       } else {
         speak(`Reached ${locName}. Do you want to proceed further to another location?`);
+        setArrivedGoalName(locName);
         setArrivedStationName(locName);
+        setShowArrivalContinuationModal(true);
         setCurrentScreen('home');
         try {
           fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
@@ -887,6 +926,106 @@ const App = () => {
                 {devPassMsg}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 4. FULL-SCREEN BLOCKING RIDER CONTINUATION MODAL (10s Countdown) */}
+      {showArrivalContinuationModal && (
+        <div 
+          className="modal-backdrop" 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(10, 15, 30, 0.88)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <div 
+            style={{
+              background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+              border: '2px solid #2ecc71',
+              borderRadius: '24px',
+              padding: '32px 24px',
+              maxWidth: '480px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+              animation: 'popIn 0.3s ease-out'
+            }}
+          >
+            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🚩</div>
+            <h2 style={{ fontSize: '24px', color: '#2ecc71', fontWeight: 800, marginBottom: '12px' }}>
+              Wheelchair Arrived!
+            </h2>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: '#fff', marginBottom: '16px' }}>
+              {(arrivedGoalName || healthData?.active_summon_station || healthData?.last_destination || 'Destination').replace(/_/g, ' ')}
+            </div>
+            
+            <p style={{ fontSize: '15px', color: '#94a3b8', lineHeight: 1.6, marginBottom: '24px' }}>
+              Do you want to proceed further with navigation to another location?
+            </p>
+
+            {/* 10-Second Countdown Badge */}
+            <div style={{ 
+              background: 'rgba(231, 76, 60, 0.15)', 
+              border: '1px solid #e74c3c', 
+              color: '#e74c3c', 
+              padding: '10px 16px', 
+              borderRadius: '30px', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontWeight: 700, 
+              fontSize: '14px',
+              marginBottom: '28px' 
+            }}>
+              ⏱️ Auto-releasing for new summoners in <span style={{ fontSize: '18px', color: '#ff6b6b' }}>{countdownSeconds}s</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '14px', flexDirection: 'column' }}>
+              <button 
+                onClick={handleContinuationYes}
+                style={{ 
+                  padding: '16px', 
+                  background: 'linear-gradient(135deg, #27ae60, #2ecc71)', 
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '14px', 
+                  fontWeight: 800, 
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(46, 204, 113, 0.4)'
+                }}
+              >
+                ✅ YES (Navigate Further)
+              </button>
+              
+              <button 
+                onClick={handleContinuationNo}
+                style={{ 
+                  padding: '14px', 
+                  background: 'rgba(239, 68, 68, 0.15)', 
+                  color: '#ef4444', 
+                  border: '1px solid #ef4444', 
+                  borderRadius: '14px', 
+                  fontWeight: 700, 
+                  fontSize: '15px',
+                  cursor: 'pointer'
+                }}
+              >
+                🛑 NO (Finish Ride / Release)
+              </button>
+            </div>
           </div>
         </div>
       )}

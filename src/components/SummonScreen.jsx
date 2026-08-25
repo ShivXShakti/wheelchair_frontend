@@ -161,6 +161,29 @@ const SummonScreen = ({
         </div>
       )}
 
+      {/* Busy / Lock Status Banner */}
+      {isBusy && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(231, 76, 60, 0.2), rgba(192, 57, 43, 0.3))',
+          border: '2px solid #e74c3c',
+          borderRadius: 'var(--radius)',
+          padding: '18px',
+          marginBottom: '20px',
+          textAlign: 'center',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+        }}>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>⛔</div>
+          <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#ff6b6b', fontWeight: 800 }}>
+            {usageState === 'in_use' ? 'WHEELCHAIR CURRENTLY IN A TRIP' : 'SUMMONING IN PROGRESS'}
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+            {usageState === 'in_use'
+              ? 'The wheelchair is currently in use by another rider. Summoning is locked until the current trip finishes.'
+              : `The wheelchair is currently traveling to ${activeStation.replace(/_/g, ' ')}. Please wait.`}
+          </p>
+        </div>
+      )}
+
       {/* System Readiness Status Card */}
       <div style={{
         background: 'var(--surface)',
