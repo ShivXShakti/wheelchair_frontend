@@ -67,6 +67,9 @@ const App = () => {
 
   // Session Heartbeat Polling
   useEffect(() => {
+    // If the mobile user completed their summoning session, STOP sending heartbeats!
+    if (currentScreen === 'summon_disconnected') return;
+
     const sendHeartbeat = async () => {
       try {
         const token = localStorage.getItem("device_pairing_token") || "";
@@ -106,7 +109,7 @@ const App = () => {
       clearInterval(interval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [clientId]);
+  }, [clientId, currentScreen, isPaired]);
 
   const [currentScreen, setCurrentScreen] = useState(() => {
     // If URL has ?mode=summon or if device is not paired, go straight to summon screen!
