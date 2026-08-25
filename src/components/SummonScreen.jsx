@@ -23,7 +23,8 @@ const SummonScreen = ({
   const navReady = !!healthData?.nav2_ready;
   const usageState = healthData?.usage_state || 'ready_to_summon';
   const activeStation = healthData?.active_summon_station || destination || '';
-  const isBusy = (usageState === 'in_use' || usageState === 'summoning') && !isPaired;
+  const isNavActive = (healthData?.is_navigating === true) || (healthData?.nav2_status && !["Unknown", "Idle", "Reached", "Failed", "Canceled"].includes(healthData.nav2_status));
+  const isBusy = (usageState === 'in_use' || usageState === 'summoning' || isNavActive) && !isPaired;
   const isLocked = isBusy || !sessionAllowed || usageState === 'summon_cancelled';
   // Display all locations / stations from loaded map semantics
   const stations = healthData?.location_names || healthData?.wheelchair_stations || [];
