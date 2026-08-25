@@ -49,6 +49,14 @@ const App = () => {
     return id;
   });
 
+  const [currentScreen, setCurrentScreen] = useState(() => {
+    // If URL has ?mode=summon or if device is not paired, go straight to summon screen!
+    if (window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
+      return 'summon';
+    }
+    return 'welcome';
+  });
+
   const [sessionAllowed, setSessionAllowed] = useState(true);
   const [sessionBlockedReason, setSessionBlockedReason] = useState('');
 
@@ -110,14 +118,6 @@ const App = () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [clientId, currentScreen, isPaired]);
-
-  const [currentScreen, setCurrentScreen] = useState(() => {
-    // If URL has ?mode=summon or if device is not paired, go straight to summon screen!
-    if (window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
-      return 'summon';
-    }
-    return 'welcome';
-  });
 
   // Check if Device Pairing Modal should be shown (Only for full on-board system access)
   useEffect(() => {
