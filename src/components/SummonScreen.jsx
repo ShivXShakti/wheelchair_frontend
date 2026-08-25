@@ -69,10 +69,13 @@ const SummonScreen = ({
           This summoning session has completed. Once your ride is finished, the wheelchair will automatically unlock for future summoners.
         </p>
         <button 
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            localStorage.removeItem("wheelchair_client_id");
+            window.location.reload();
+          }}
           style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #2980b9, #3498db)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 700, cursor: 'pointer', fontSize: '15px' }}
         >
-          🔄 New Session / Reconnect
+          🔄 Connect New Session / Summon Again
         </button>
       </div>
     );

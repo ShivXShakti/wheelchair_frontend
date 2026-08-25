@@ -351,7 +351,7 @@ const App = () => {
     speak("Please use wheelchair tab for further navigation.");
     setShowUseWheelchairModal(false);
     
-    // Set wheelchair usage state to in_use on backend
+    // 1. Set wheelchair usage state to in_use on backend
     try {
       await fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
         method: 'POST',
@@ -360,12 +360,20 @@ const App = () => {
       });
     } catch(e) {}
 
-    // Disconnect session beacon
+    // 2. Send immediate disconnect request to backend
     try {
+      await fetch(`${config.API_BASE_URL}/session/disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId })
+      });
       navigator.sendBeacon(`${config.API_BASE_URL}/session/disconnect`, JSON.stringify({ client_id: clientId }));
     } catch(e) {}
 
-    // Transition mobile summoner to clean summon_disconnected screen
+    // 3. Remove client ID so future connections require a new session
+    localStorage.removeItem("wheelchair_client_id");
+
+    // 4. Transition mobile summoner to clean summon_disconnected screen
     setCurrentScreen('summon_disconnected');
     setDestination(null);
   };
