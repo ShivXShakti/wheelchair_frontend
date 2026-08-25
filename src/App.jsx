@@ -262,14 +262,23 @@ const App = () => {
   const [showUseWheelchairModal, setShowUseWheelchairModal] = useState(false);
   const [arrivedStationName, setArrivedStationName] = useState('');
   const [showArrivalContinuationModal, setShowArrivalContinuationModal] = useState(false);
+  const timeoutVal = config.AUTO_RELEASE_TIMEOUT_SEC || 10;
   const [arrivedGoalName, setArrivedGoalName] = useState('');
-  const [countdownSeconds, setCountdownSeconds] = useState(10);
+  const [countdownSeconds, setCountdownSeconds] = useState(timeoutVal);
 
-  // 10-Second Auto-Timeout for Arrival Continuation Modal
+  // Auto-close residual arrival modal on summoning portal when wheelchair is ready_to_summon
+  useEffect(() => {
+    if (healthData?.usage_state === 'ready_to_summon') {
+      setShowUseWheelchairModal(false);
+    }
+  }, [healthData?.usage_state]);
+
+  // Configurable Auto-Timeout for Arrival Continuation Modal
   useEffect(() => {
     let timer = null;
+    const initialSec = config.AUTO_RELEASE_TIMEOUT_SEC || 10;
     if (showArrivalContinuationModal) {
-      setCountdownSeconds(10);
+      setCountdownSeconds(initialSec);
       timer = setInterval(() => {
         setCountdownSeconds((prev) => {
           if (prev <= 1) {
@@ -283,7 +292,7 @@ const App = () => {
         });
       }, 1000);
     } else {
-      setCountdownSeconds(10);
+      setCountdownSeconds(initialSec);
     }
     return () => {
       if (timer) clearInterval(timer);
@@ -307,12 +316,20 @@ const App = () => {
 
     if (isReached && wasNotReached) {
       const locName = destination || healthData?.last_destination || arrivedStationName || 'destination';
-      const isSummonUser = (currentScreen === 'summon' && !localStorage.getItem("device_pairing_token"));
-      if (isSummonUser) {
-        speak(`Reached ${locName}. Please press button to use wheelchair.`);
-        setArrivedStationName(locName);
-        setShowUseWheelchairModal(true);
+      const isUnauthSummoner = (currentScreen === 'summon' && !localStorage.getItem("device_pairing_token"));
+      
+      if (isUnauthSummoner) {
+        // Unauthorized summoning portal: ONLY show arrival prompt if THIS session is actively summoning
+        const isActivelySummoning = (healthData?.usage_state === 'summoning') && (!!destination || !!healthData?.active_summon_station);
+        if (isActivelySummoning) {
+          speak(`Reached ${locName}. Please press button to use wheelchair.`);
+          setArrivedStationName(locName);
+          setShowUseWheelchairModal(true);
+        } else {
+          setShowUseWheelchairModal(false);
+        }
       } else {
+        // Authorized / On-Board Wheelchair Tablet
         speak(`Reached ${locName}. Do you want to proceed further to another location?`);
         setArrivedGoalName(locName);
         setArrivedStationName(locName);
@@ -328,7 +345,7 @@ const App = () => {
       }
     }
     setPrevNav2Status(currentStatus);
-  }, [healthData?.nav2_status, currentScreen, destination, prevNav2Status, arrivedStationName, healthData?.last_destination]);
+  }, [healthData?.nav2_status, healthData?.usage_state, healthData?.active_summon_station, currentScreen, destination, prevNav2Status, arrivedStationName, healthData?.last_destination]);
 
   const handleUseWheelchairClick = async () => {
     speak("Please use wheelchair tab for further navigation.");
