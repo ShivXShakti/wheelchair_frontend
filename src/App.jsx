@@ -372,9 +372,8 @@ const App = () => {
     if (!healthData || currentScreen === 'summon_disconnected') return;
     const currentStatus = healthData.nav2_status;
     const isReached = isStatusReached(currentStatus);
-    const wasNotReached = !isStatusReached(prevNav2Status);
 
-    if (isReached && wasNotReached) {
+    if (isReached) {
       const locName = destination || healthData?.last_destination || arrivedStationName || 'destination';
       const isUnauthSummoner = (currentScreen === 'summon' && !localStorage.getItem("device_pairing_token"));
       
@@ -382,29 +381,37 @@ const App = () => {
         // Unauthorized summoning portal: ONLY show arrival prompt if THIS session is actively summoning
         const isActivelySummoning = (healthData?.usage_state === 'summoning') && (!!destination || !!healthData?.active_summon_station);
         if (isActivelySummoning) {
-          speak(`Reached ${locName}. Please press button to use wheelchair.`);
-          setArrivedStationName(locName);
-          setShowUseWheelchairModal(true);
+          if (!showUseWheelchairModal) {
+            speak(`Reached ${locName}. Please press button to use wheelchair.`);
+            setArrivedStationName(locName);
+            setShowUseWheelchairModal(true);
+          }
         } else {
           setShowUseWheelchairModal(false);
         }
       } else {
         // Authorized / On-Board Wheelchair Tablet
-        speak(`Reached ${locName}. Do you want to proceed further to another location?`);
-        setArrivedGoalName(locName);
-        setArrivedStationName(locName);
-        setShowArrivalContinuationModal(true);
-        try {
-          fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state: 'in_use', station: locName })
-          });
-        } catch(e) {}
+        if (!showArrivalContinuationModal) {
+          speak(`Reached ${locName}. Do you want to proceed further to another location?`);
+          setArrivedGoalName(locName);
+          setArrivedStationName(locName);
+          setShowArrivalContinuationModal(true);
+          try {
+            fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ state: 'in_use', station: locName })
+            });
+          } catch(e) {}
+        }
       }
+    } else {
+      // If navigation is active (not reached), ensure arrival modals are closed
+      setShowUseWheelchairModal(false);
+      setShowArrivalContinuationModal(false);
     }
     setPrevNav2Status(currentStatus);
-  }, [healthData?.nav2_status, healthData?.usage_state, healthData?.active_summon_station, currentScreen, destination, prevNav2Status, arrivedStationName, healthData?.last_destination]);
+  }, [healthData?.nav2_status, healthData?.usage_state, healthData?.active_summon_station, currentScreen, destination, prevNav2Status, arrivedStationName, healthData?.last_destination, showUseWheelchairModal, showArrivalContinuationModal]);
 
   const handleUseWheelchairClick = async () => {
     speak("Please use wheelchair tab for further navigation.");
