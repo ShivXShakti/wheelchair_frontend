@@ -26,7 +26,10 @@ const config = {
   AUTO_RELEASE_TIMEOUT_SEC: 10,
 
   // Idle time (in seconds) after teleoperating stops before prompting the user for further navigation
-  teleope_idle_f: 10
+  teleope_idle_f: 10,
+
+  // Time (in seconds) for auto-pressing Use Wheelchair button on summoning portal upon arrival
+  summon_portal_autodisconnect_time_f: 5
 };
 
 export default config;

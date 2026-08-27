@@ -340,13 +340,11 @@ const App = () => {
   // Configurable Auto-Timeout for Use Wheelchair Modal (Unauthorized Summoner)
   useEffect(() => {
     let timer = null;
-    const initialSec = config.AUTO_RELEASE_TIMEOUT_SEC || 10;
+    const disconnectSec = config.summon_portal_autodisconnect_time_f || 5;
     if (showUseWheelchairModal) {
       timer = setTimeout(() => {
-        handleReleaseWheelchair();
-        setShowUseWheelchairModal(false);
-        setDestination(null);
-      }, initialSec * 1000);
+        handleUseWheelchairClick();
+      }, disconnectSec * 1000);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -375,6 +373,23 @@ const App = () => {
     if (!healthData || currentScreen === 'summon_disconnected') return;
     const currentStatus = healthData.nav2_status;
     const isReached = isStatusReached(currentStatus);
+
+    // Parse status to check if robot is actively moving/navigating
+    let parsedStatus = 'unknown';
+    const rawStatus = healthData?.nav2_status;
+    if (rawStatus) {
+      if (typeof rawStatus === 'string' && rawStatus.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rawStatus);
+          parsedStatus = String(parsed.status || 'unknown').toLowerCase();
+        } catch (e) {
+          parsedStatus = String(rawStatus).toLowerCase();
+        }
+      } else {
+        parsedStatus = String(rawStatus).toLowerCase();
+      }
+    }
+    const isMovingNow = (healthData?.is_navigating === true) || ["executing", "navigating", "moving"].includes(parsedStatus);
 
     if (isReached) {
       // If we already handled the arrival prompt for this destination state, do not repeat
@@ -413,8 +428,8 @@ const App = () => {
           } catch(e) {}
         }
       }
-    } else {
-      // If navigation is active (not reached), ensure arrival modals are closed and reset tracking ref
+    } else if (isMovingNow) {
+      // If navigation is active (actively moving), ensure arrival modals are closed and reset tracking ref
       setShowUseWheelchairModal(false);
       setShowArrivalContinuationModal(false);
       hasHandledArrivalRef.current = false;
