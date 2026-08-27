@@ -151,7 +151,17 @@ const TeleopScreen = ({ goHome, onActivity }) => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopPublishing();
+      if (publishIntervalRef.current) {
+        clearInterval(publishIntervalRef.current);
+        publishIntervalRef.current = null;
+      }
+      commandRef.current = { linear_x: 0.0, angular_z: 0.0 };
+      fetch(`${config.API_BASE_URL}/teleop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ linear_x: 0.0, angular_z: 0.0 }),
+        keepalive: true
+      }).catch(err => console.error("Teleop publish error:", err));
     };
   }, []);
 
@@ -159,7 +169,12 @@ const TeleopScreen = ({ goHome, onActivity }) => {
     <div className="screen active" style={{ flex: 1, display: 'flex' }}>
       <div className="screen-header">
         <button className="back-btn" onClick={() => {
-          stopPublishing();
+          if (publishIntervalRef.current) {
+            clearInterval(publishIntervalRef.current);
+            publishIntervalRef.current = null;
+          }
+          commandRef.current = { linear_x: 0.0, angular_z: 0.0 };
+          publishCommand();
           goHome();
         }}>← Back</button>
         <span className="screen-title">Teleoperation</span>
