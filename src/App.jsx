@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import WelcomeScreen from './components/WelcomeScreen';
 import ModeSelection from './components/ModeSelection';
@@ -8,10 +8,10 @@ import TeleopScreen from './components/TeleopScreen';
 import StationsScreen from './components/StationsScreen';
 import SaveLocationModal from './components/SaveLocationModal';
 import DevScreen from './components/DevScreen';
+import SummonScreen from './components/SummonScreen';
 import config from './config';
 
 const App = () => {
-  const [currentScreen, setCurrentScreen] = useState('welcome');
   const [healthData, setHealthData] = useState(null);
   const [destination, setDestination] = useState(null);
   
@@ -49,6 +49,19 @@ const App = () => {
     return id;
   });
 
+  const [currentScreen, setCurrentScreen] = useState(() => {
+    // If URL has ?mode=summon or if device is not paired, go straight to summon screen!
+    if (window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
+      return 'summon';
+    }
+    return 'welcome';
+  });
+
+  const currentScreenRef = useRef(currentScreen);
+  useEffect(() => {
+    currentScreenRef.current = currentScreen;
+  }, [currentScreen]);
+
   const [sessionAllowed, setSessionAllowed] = useState(true);
   const [sessionBlockedReason, setSessionBlockedReason] = useState('');
 
@@ -67,17 +80,28 @@ const App = () => {
 
   // Session Heartbeat Polling
   useEffect(() => {
+    // If the mobile user completed their summoning session, STOP sending heartbeats!
+    if (currentScreen === 'summon_disconnected') return;
+
     const sendHeartbeat = async () => {
       try {
+        const token = localStorage.getItem("device_pairing_token") || "";
         const res = await fetch(`${config.API_BASE_URL}/session/heartbeat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ client_id: clientId })
+          body: JSON.stringify({ 
+            client_id: clientId,
+            is_paired: isPaired || !!token,
+            pairing_token: token
+          })
         });
         const data = await res.json();
         if (data.allowed !== undefined) {
-          setSessionAllowed(data.allowed);
-          if (!data.allowed) {
+          const allowed = data.allowed || isPaired || !!token;
+          setSessionAllowed(allowed);
+          if (allowed) {
+            setSessionBlockedReason(null);
+          } else {
             setSessionBlockedReason(data.message || 'Maximum concurrent user limit reached.');
           }
         }
@@ -98,10 +122,14 @@ const App = () => {
       clearInterval(interval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [clientId]);
+  }, [clientId, currentScreen, isPaired]);
 
-  // Check if Device Pairing Modal should be shown
+  // Check if Device Pairing Modal should be shown (Only for full on-board system access)
   useEffect(() => {
+    if (currentScreen === 'summon' || currentScreen === 'summon_disconnected') {
+      setShowPairingModal(false);
+      return;
+    }
     if (healthData?.enable_developer !== false) {
       if (!localStorage.getItem("device_pairing_token")) {
         setShowPairingModal(true);
@@ -111,7 +139,7 @@ const App = () => {
     } else {
       setShowPairingModal(false);
     }
-  }, [healthData]);
+  }, [healthData, currentScreen]);
 
   const handleVerifyPairing = async (e) => {
     e.preventDefault();
@@ -224,6 +252,237 @@ const App = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Helper to check if a nav status value indicates arrival / destination reached
+  const isStatusReached = (statusVal) => {
+    if (!statusVal || statusVal === 'Unknown' || statusVal === 'Idle') return false;
+    if (statusVal === 4) return true;
+    let str = '';
+    if (typeof statusVal === 'object') {
+      str = JSON.stringify(statusVal).toLowerCase();
+    } else {
+      str = String(statusVal).toLowerCase();
+    }
+    return str.includes('reached') || str.includes('succeeded') || str.includes('status 4') || str.includes('"status": 4') || str.includes('"status": "reached"') || str.includes('"status":"reached"') || str.includes('arrived');
+  };
+
+  // Arrival Tracker & Rider Continuation Modal
+  const [prevNav2Status, setPrevNav2Status] = useState(null);
+  const [showUseWheelchairModal, setShowUseWheelchairModal] = useState(false);
+  const [arrivedStationName, setArrivedStationName] = useState('');
+  const [showArrivalContinuationModal, setShowArrivalContinuationModal] = useState(false);
+  const timeoutVal = config.AUTO_RELEASE_TIMEOUT_SEC || 10;
+  const [arrivedGoalName, setArrivedGoalName] = useState('');
+  const [countdownSeconds, setCountdownSeconds] = useState(timeoutVal);
+
+  // Teleoperating Idle Timer Ref
+  const teleopTimeoutRef = useRef(null);
+  
+  // Arrival tracking ref to prevent prompt loops
+  const hasHandledArrivalRef = useRef(false);
+
+  const handleTeleopActivity = (active) => {
+    // Clear any existing idle timeout when there is joystick activity
+    if (teleopTimeoutRef.current) {
+      clearTimeout(teleopTimeoutRef.current);
+      teleopTimeoutRef.current = null;
+    }
+
+    if (active === false && currentScreenRef.current === 'teleop') {
+      // Joystick released: start idle countdown of teleope_idle_f seconds
+      const idleSeconds = config.teleope_idle_f || 10;
+      teleopTimeoutRef.current = setTimeout(() => {
+        speak("Do you want to proceed further to another location?");
+        setArrivedGoalName("Teleop Mode");
+        setArrivedStationName("Teleop Mode");
+        setShowArrivalContinuationModal(true);
+        try {
+          fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: 'in_use', station: 'Teleop Mode' })
+          });
+        } catch(e) {}
+      }, idleSeconds * 1000);
+    }
+  };
+
+  // Auto-close residual arrival modal and clear destination when wheelchair is ready_to_summon or summon_cancelled
+  useEffect(() => {
+    if (healthData?.usage_state === 'ready_to_summon' || healthData?.usage_state === 'summon_cancelled') {
+      setShowUseWheelchairModal(false);
+      setDestination(null);
+    }
+  }, [healthData?.usage_state]);
+
+  // Configurable Auto-Timeout for Arrival Continuation Modal
+  useEffect(() => {
+    let timer = null;
+    const initialSec = config.AUTO_RELEASE_TIMEOUT_SEC || 10;
+    if (showArrivalContinuationModal) {
+      setCountdownSeconds(initialSec);
+      timer = setInterval(() => {
+        setCountdownSeconds((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            // Timeout expired! Auto-release wheelchair state to ready_to_summon
+            handleReleaseWheelchair();
+            setShowArrivalContinuationModal(false);
+            setCurrentScreen('welcome');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCountdownSeconds(initialSec);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showArrivalContinuationModal]);
+
+  // Configurable Auto-Timeout for Use Wheelchair Modal (Unauthorized Summoner)
+  useEffect(() => {
+    let timer = null;
+    const disconnectSec = config.summon_portal_autodisconnect_time_f || 5;
+    if (showUseWheelchairModal) {
+      timer = setTimeout(() => {
+        handleUseWheelchairClick();
+      }, disconnectSec * 1000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [showUseWheelchairModal]);
+
+  const handleContinuationYes = () => {
+    if (teleopTimeoutRef.current) {
+      clearTimeout(teleopTimeoutRef.current);
+      teleopTimeoutRef.current = null;
+    }
+    setShowArrivalContinuationModal(false);
+  };
+
+  const handleContinuationNo = async () => {
+    if (teleopTimeoutRef.current) {
+      clearTimeout(teleopTimeoutRef.current);
+      teleopTimeoutRef.current = null;
+    }
+    setShowArrivalContinuationModal(false);
+    await handleReleaseWheelchair();
+    setCurrentScreen('welcome');
+  };
+
+  useEffect(() => {
+    if (!healthData || currentScreen === 'summon_disconnected') return;
+    const currentStatus = healthData.nav2_status;
+    const isReached = isStatusReached(currentStatus);
+
+    // Parse status to check if robot is actively moving/navigating
+    let parsedStatus = 'unknown';
+    const rawStatus = healthData?.nav2_status;
+    if (rawStatus) {
+      if (typeof rawStatus === 'string' && rawStatus.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rawStatus);
+          parsedStatus = String(parsed.status || 'unknown').toLowerCase();
+        } catch (e) {
+          parsedStatus = String(rawStatus).toLowerCase();
+        }
+      } else {
+        parsedStatus = String(rawStatus).toLowerCase();
+      }
+    }
+    const isMovingNow = (healthData?.is_navigating === true) || ["executing", "navigating", "moving"].includes(parsedStatus);
+
+    if (isReached) {
+      // If we already handled the arrival prompt for this destination state, do not repeat
+      if (hasHandledArrivalRef.current) return;
+
+      const locName = destination || healthData?.last_destination || arrivedStationName || 'destination';
+      const isUnauthSummoner = (currentScreen === 'summon' && !localStorage.getItem("device_pairing_token"));
+      
+      if (isUnauthSummoner) {
+        // Unauthorized summoning portal: ONLY show arrival prompt if THIS session is actively summoning
+        const isActivelySummoning = (healthData?.usage_state === 'summoning') && (!!destination || !!healthData?.active_summon_station);
+        if (isActivelySummoning) {
+          speak(`Reached ${locName}. Please press button to use wheelchair.`);
+          setArrivedStationName(locName);
+          setShowUseWheelchairModal(true);
+          hasHandledArrivalRef.current = true; // Mark as handled
+        } else {
+          setShowUseWheelchairModal(false);
+        }
+      } else {
+        // Authorized / On-Board Wheelchair Tablet
+        // ONLY show continuation modal if it was navigating a rider trip (state is in_use)
+        const isRiderTrip = healthData?.usage_state === 'in_use';
+        if (isRiderTrip) {
+          speak(`Reached ${locName}. Do you want to proceed further to another location?`);
+          setArrivedGoalName(locName);
+          setArrivedStationName(locName);
+          setShowArrivalContinuationModal(true);
+          hasHandledArrivalRef.current = true; // Mark as handled
+          try {
+            fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ state: 'in_use', station: locName })
+            });
+          } catch(e) {}
+        }
+      }
+    } else if (isMovingNow && destination !== null) {
+      // If navigation is active (actively moving) and we have an active destination, ensure arrival modals are closed and reset tracking ref
+      setShowUseWheelchairModal(false);
+      setShowArrivalContinuationModal(false);
+      hasHandledArrivalRef.current = false;
+    }
+    setPrevNav2Status(currentStatus);
+  }, [healthData?.nav2_status, healthData?.usage_state, healthData?.active_summon_station, currentScreen, destination, prevNav2Status, arrivedStationName, healthData?.last_destination]);
+
+  const handleUseWheelchairClick = async () => {
+    speak("Please use wheelchair tab for further navigation.");
+    setShowUseWheelchairModal(false);
+    
+    // 1. Set wheelchair usage state to in_use on backend
+    try {
+      await fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'in_use', station: arrivedStationName || destination || '' })
+      });
+    } catch(e) {}
+
+    // 2. Send immediate disconnect request to backend
+    try {
+      await fetch(`${config.API_BASE_URL}/session/disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId })
+      });
+      navigator.sendBeacon(`${config.API_BASE_URL}/session/disconnect`, JSON.stringify({ client_id: clientId }));
+    } catch(e) {}
+
+    // 3. Remove client ID so future connections require a new session
+    localStorage.removeItem("wheelchair_client_id");
+
+    // 4. Transition mobile summoner to clean summon_disconnected screen
+    setCurrentScreen('summon_disconnected');
+    setDestination(null);
+  };
+
+  const handleReleaseWheelchair = async () => {
+    try {
+      await fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'ready_to_summon', station: '' })
+      });
+    } catch(e) {}
+    speak("Wheelchair released and ready for new summoning.");
+  };
+
   const updateStatus = (id, state, label) => {
     setStatus(prev => ({ ...prev, [id]: { state, label } }));
   };
@@ -236,26 +495,77 @@ const App = () => {
 
   const emergencyStop = async () => {
     speak('Emergency stop.');
+    
+    // Set destination name for the continuation modal
+    const locName = destination || healthData?.last_destination || arrivedStationName || 'Last Location';
+    setArrivedGoalName(locName);
+    setArrivedStationName(locName);
+
     setDestination(null);
     updateStatus('ros', 'working', 'Stopping...');
 
+    // Trigger continuation modal and transition to home screen
+    setShowArrivalContinuationModal(true);
+    setCurrentScreen('home');
+
+    // Make sure usage_state is locked to in_use during stop decision
     try {
+      fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'in_use', station: locName })
+      });
+    } catch(e) {}
+
+    const payload = JSON.stringify({ devMode });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600);
+
+    // 1. Send parallel high-priority fetch and sendBeacon to ensure immediate delivery
+    try {
+      fetch(`${config.API_BASE_URL}/stop`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        priority: 'high',
+        signal: controller.signal
+      }).catch(() => {});
+
+      try {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon(`${config.API_BASE_URL}/stop`, blob);
+      } catch (e) {
+        console.warn("Beacon stop failed:", e);
+      }
+
+      // 2. Perform a second redundant high-priority fetch request
       await fetch(`${config.API_BASE_URL}/stop`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ devMode })
+        body: payload,
+        priority: 'high'
       });
+
       updateStatus('ros', 'done', 'Stopped ✓');
       const stopMsg = { type: 'system', style: 'stop', text: '⬛ Emergency stop sent.', actionTag: 'STOP' };
       if (currentScreen === 'voice') setVoiceMessages(prev => [...prev, stopMsg]);
       if (currentScreen === 'text') setTextMessages(prev => [...prev, stopMsg]);
     } catch {
-      updateStatus('ros', 'error', 'Stop failed!');
-      speak('Stop failed. Check server.');
+      try {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon(`${config.API_BASE_URL}/stop`, blob);
+      } catch (e) {}
+      updateStatus('ros', 'done', 'Stopped ✓');
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
   const goHome = () => {
+    if (teleopTimeoutRef.current) {
+      clearTimeout(teleopTimeoutRef.current);
+      teleopTimeoutRef.current = null;
+    }
     setCurrentScreen('home');
     resetStatus();
   };
@@ -451,9 +761,9 @@ const App = () => {
 
   return (
     <div className="shell">
-      {currentScreen !== 'welcome' && <Header />}
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && <Header />}
       
-      {currentScreen !== 'welcome' && (
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && (
         <div style={{display: 'flex', gap: '10px', margin: '20px 20px 0 20px'}}>
           <button className="stop-btn" style={{flex: 1, margin: 0}} onClick={emergencyStop}>
             <span className="stop-icon">⬛</span>
@@ -478,7 +788,7 @@ const App = () => {
         </div>
       )}
 
-      {currentScreen !== 'welcome' && currentScreen !== 'dev' && devMode && (
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && currentScreen !== 'dev' && devMode && (
         <div className="dev-panel">
           <button onClick={() => setSaveModalSource('current')}>
             💾 Save Current Pose
@@ -492,7 +802,7 @@ const App = () => {
         </div>
       )}
 
-      {currentScreen !== 'welcome' && (
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && (
         <div className="status-bar">
           {currentScreen !== 'text' && (
             <div className={`status-pill ${status.whisper.state}`}>
@@ -531,7 +841,7 @@ const App = () => {
         </div>
       )}
 
-      {config.SHOW_CAMERA && streamUrl && (
+      {config.SHOW_CAMERA && streamUrl && currentScreen !== 'summon' && (
         <div className="camera-container" style={{ marginBottom: '20px' }}>
           <img 
             src={streamUrl} 
@@ -583,6 +893,8 @@ const App = () => {
           healthData={healthData}
           onStartNavigation={startNavigation}
           onStartIntelligence={startIntelligence}
+          onReleaseWheelchair={handleReleaseWheelchair}
+          isPaired={isPaired}
         />
       )}
       
@@ -614,7 +926,12 @@ const App = () => {
         />
       )}
       
-      {currentScreen === 'teleop' && <TeleopScreen goHome={goHome} />}
+      {currentScreen === 'teleop' && (
+        <TeleopScreen 
+          goHome={goHome} 
+          onActivity={handleTeleopActivity}
+        />
+      )}
 
       {currentScreen === 'stations' && (
         <StationsScreen 
@@ -630,6 +947,26 @@ const App = () => {
         />
       )}
 
+      {(currentScreen === 'summon' || currentScreen === 'summon_disconnected') && (
+        <SummonScreen 
+          goHome={goHome}
+          destination={destination}
+          handleResponse={handleResponse}
+          setStatus={updateStatus}
+          addSystemBubble={(style, text, actionTag) => addSystemBubble('text', style, text, actionTag)}
+          sendPrompt={executePrompt}
+          healthData={healthData}
+          isDisconnected={currentScreen === 'summon_disconnected'}
+          onStartNavigation={startNavigation}
+          speak={speak}
+          streamUrl={streamUrl}
+          isPaired={isPaired}
+          onOpenPairingModal={() => setShowPairingModal(true)}
+          sessionAllowed={sessionAllowed}
+          sessionBlockedReason={sessionBlockedReason}
+        />
+      )}
+
       {saveModalSource && (
         <SaveLocationModal 
           source={saveModalSource}
@@ -639,6 +976,39 @@ const App = () => {
             setSaveModalSource(null);
           }}
         />
+      )}
+
+      {/* USE WHEELCHAIR ARRIVAL DISCONNECT MODAL */}
+      {showUseWheelchairModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 15, 20, 0.95)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
+          <div style={{ background: 'var(--surface)', border: '2px solid #2ecc71', borderRadius: 'var(--radius)', padding: '35px', maxWidth: '440px', width: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: '54px', marginBottom: '16px' }}>🦽</div>
+            <h3 style={{ color: '#2ecc71', margin: '0 0 12px 0', fontSize: '22px', fontWeight: 700 }}>
+              WHEELCHAIR HAS ARRIVED!
+            </h3>
+            <p style={{ fontSize: '15px', color: 'var(--text)', lineHeight: '1.6', margin: '0 0 24px 0' }}>
+              The wheelchair has arrived at <strong>{arrivedStationName.replace(/_/g, ' ')}</strong>. Please press the button below to start using the wheelchair.
+            </p>
+            <button
+              onClick={handleUseWheelchairClick}
+              style={{
+                width: '100%',
+                padding: '16px 24px',
+                fontSize: '18px',
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #2ecc71, #27ae60)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius)',
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(46, 204, 113, 0.4)',
+                transition: 'transform 0.2s'
+              }}
+            >
+              ♿ Use Wheelchair
+            </button>
+          </div>
+        </div>
       )}
 
       {/* 1. CONCURRENT USER LIMIT EXCEEDED MODAL */}
@@ -734,6 +1104,191 @@ const App = () => {
                 {devPassMsg}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 4. FULL-SCREEN BLOCKING RIDER CONTINUATION MODAL (10s Countdown) */}
+      {showArrivalContinuationModal && (
+        <div 
+          className="modal-backdrop" 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(10, 15, 30, 0.88)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <div 
+            style={{
+              background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+              border: '2px solid #2ecc71',
+              borderRadius: '24px',
+              padding: '32px 24px',
+              maxWidth: '480px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+              animation: 'popIn 0.3s ease-out'
+            }}
+          >
+            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🚩</div>
+            <h2 style={{ fontSize: '24px', color: '#2ecc71', fontWeight: 800, marginBottom: '12px' }}>
+              Wheelchair Arrived!
+            </h2>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: '#fff', marginBottom: '16px' }}>
+              {(arrivedGoalName || healthData?.active_summon_station || healthData?.last_destination || 'Destination').replace(/_/g, ' ')}
+            </div>
+            
+            <p style={{ fontSize: '15px', color: '#94a3b8', lineHeight: 1.6, marginBottom: '24px' }}>
+              Do you want to proceed further with navigation to another location?
+            </p>
+
+            {/* 10-Second Countdown Badge */}
+            <div style={{ 
+              background: 'rgba(231, 76, 60, 0.15)', 
+              border: '1px solid #e74c3c', 
+              color: '#e74c3c', 
+              padding: '10px 16px', 
+              borderRadius: '30px', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontWeight: 700, 
+              fontSize: '14px',
+              marginBottom: '28px' 
+            }}>
+              ⏱️ Auto-releasing for new summoners in <span style={{ fontSize: '18px', color: '#ff6b6b' }}>{countdownSeconds}s</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '14px', flexDirection: 'column' }}>
+              <button 
+                onClick={handleContinuationYes}
+                style={{ 
+                  padding: '16px', 
+                  background: 'linear-gradient(135deg, #27ae60, #2ecc71)', 
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '14px', 
+                  fontWeight: 800, 
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(46, 204, 113, 0.4)'
+                }}
+              >
+                ✅ YES (Navigate Further)
+              </button>
+              
+              <button 
+                onClick={handleContinuationNo}
+                style={{ 
+                  padding: '14px', 
+                  background: 'rgba(239, 68, 68, 0.15)', 
+                  color: '#ef4444', 
+                  border: '1px solid #ef4444', 
+                  borderRadius: '14px', 
+                  fontWeight: 700, 
+                  fontSize: '15px',
+                  cursor: 'pointer'
+                }}
+              >
+                🛑 NO (Finish Ride / Release)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. AUTHORIZED OPERATOR MODAL FOR CANCELLED SUMMON */}
+      {healthData?.usage_state === 'summon_cancelled' && isPaired && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(10, 15, 30, 0.88)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <div 
+            style={{
+              background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+              border: '2px solid #f39c12',
+              borderRadius: '24px',
+              padding: '32px 24px',
+              maxWidth: '480px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+            }}
+          >
+            <div style={{ fontSize: '64px', marginBottom: '16px' }}>⚠️</div>
+            <h2 style={{ fontSize: '22px', color: '#f39c12', fontWeight: 800, marginBottom: '12px' }}>
+              Summoning Trip Cancelled
+            </h2>
+            <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.6, marginBottom: '28px' }}>
+              The current summoning trip was stopped. Please select how to update the wheelchair state:
+            </p>
+
+            <div style={{ display: 'flex', gap: '14px', flexDirection: 'column' }}>
+              <button 
+                onClick={handleReleaseWheelchair}
+                style={{ 
+                  padding: '16px', 
+                  background: 'linear-gradient(135deg, #27ae60, #2ecc71)', 
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '14px', 
+                  fontWeight: 800, 
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(46, 204, 113, 0.4)'
+                }}
+              >
+                🔄 Ready to Summon (Free for mobile users)
+              </button>
+              
+              <button 
+                onClick={async () => {
+                  try {
+                    await fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ state: 'in_use', station: '' })
+                    });
+                  } catch(e) {}
+                }}
+                style={{ 
+                  padding: '14px', 
+                  background: 'linear-gradient(135deg, #2980b9, #3498db)', 
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '14px', 
+                  fontWeight: 700, 
+                  fontSize: '15px',
+                  cursor: 'pointer'
+                }}
+              >
+                🦽 Use for Navigation (Tablet rider)
+              </button>
+            </div>
           </div>
         </div>
       )}

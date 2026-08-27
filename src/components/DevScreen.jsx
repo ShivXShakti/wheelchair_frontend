@@ -60,13 +60,61 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
     }
   };
 
-  // Fetch BBS config, config flags, and glass status on mount
+  // Wi-Fi Switcher State
+  const [wifiSsidInput, setWifiSsidInput] = useState('');
+  const [wifiPassInput, setWifiPassInput] = useState('');
+  const [connectingWifi, setConnectingWifi] = useState(false);
+  const [wifiMsg, setWifiMsg] = useState('');
+  const [connectedSsid, setConnectedSsid] = useState('Checking...');
+
+  const fetchWifiStatus = async () => {
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/wifi/status`);
+      const data = await res.json();
+      if (data.connected_ssid) {
+        setConnectedSsid(data.connected_ssid);
+      }
+    } catch (e) {
+      console.error("Failed to fetch Wi-Fi status:", e);
+    }
+  };
+
+  const handleConnectWifi = async (ssidToConnect, passwordToUse) => {
+    setConnectingWifi(true);
+    setWifiMsg(`Connecting to '${ssidToConnect}'...`);
+    try {
+      const res = await fetch(`${config.API_BASE_URL}/wifi/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ssid: ssidToConnect, password: passwordToUse || null })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setWifiMsg(`✅ ${data.message}`);
+        setTimeout(fetchWifiStatus, 2000);
+      } else {
+        setWifiMsg(`❌ ${data.message || 'Connection failed.'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setWifiMsg('❌ Error sending Wi-Fi connection request.');
+    } finally {
+      setConnectingWifi(false);
+    }
+  };
+
+  // Fetch BBS config, config flags, glass status, and Wi-Fi status on mount
   useEffect(() => {
     fetchBbsConfig();
     fetchConfig();
     fetchGlassStatus();
+    fetchWifiStatus();
     const interval = setInterval(fetchGlassStatus, 4000);
-    return () => clearInterval(interval);
+    const wifiInterval = setInterval(fetchWifiStatus, 6000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(wifiInterval);
+    };
   }, []);
 
   const fetchGlassStatus = async () => {
@@ -376,6 +424,110 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
         </div>
       </div>
 
+      {/* SECTION 1.5: WI-FI NETWORK SWITCHER */}
+      <div className="status-panel" style={{ background: 'var(--surface)', border: '1px solid #3498db', borderRadius: 'var(--radius)', padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '16px', color: '#3498db' }}>📶 WI-FI NETWORK SWITCHER</h3>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Connect wheelchair Jetson to available wireless networks
+            </div>
+          </div>
+          <span style={{ 
+            padding: '6px 12px', 
+            borderRadius: '12px', 
+            fontSize: '12px', 
+            fontWeight: 700, 
+            background: 'rgba(52, 152, 219, 0.15)',
+            color: '#3498db',
+            border: '1px solid #3498db'
+          }}>
+            📡 Active: {connectedSsid}
+          </span>
+        </div>
+
+        {/* Preset Quick Connect Buttons */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '18px' }}>
+          <button 
+            onClick={() => handleConnectWifi('wifi@iiith', '')}
+            disabled={connectingWifi}
+            style={{ 
+              padding: '14px', 
+              background: 'linear-gradient(135deg, #2980b9, #3498db)', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 'var(--radius)', 
+              fontWeight: 600, 
+              cursor: connectingWifi ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span style={{ fontSize: '18px' }}>📶 wifi@iiith</span>
+            <span style={{ fontSize: '11px', opacity: 0.9 }}>Quick Connect (IIIT Network)</span>
+          </button>
+
+          <button 
+            onClick={() => handleConnectWifi('wheelchair@rrc', 'wheelchair@1234')}
+            disabled={connectingWifi}
+            style={{ 
+              padding: '14px', 
+              background: 'linear-gradient(135deg, #8e44ad, #9b59b6)', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 'var(--radius)', 
+              fontWeight: 600, 
+              cursor: connectingWifi ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span style={{ fontSize: '18px' }}>🔒 wheelchair@rrc</span>
+            <span style={{ fontSize: '11px', opacity: 0.9 }}>Preconfigured (wheelchair@1234)</span>
+          </button>
+        </div>
+
+        {/* Custom Wi-Fi Connect Form */}
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          if (wifiSsidInput.trim()) {
+            handleConnectWifi(wifiSsidInput.trim(), wifiPassInput.trim());
+          }
+        }} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--surface2)', padding: '14px', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+          <input 
+            type="text" 
+            placeholder="Custom Network SSID" 
+            value={wifiSsidInput}
+            onChange={(e) => setWifiSsidInput(e.target.value)}
+            style={{ flex: 1, minWidth: '160px', padding: '10px', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '13px' }}
+          />
+          <input 
+            type="password" 
+            placeholder="Password (if protected)" 
+            value={wifiPassInput}
+            onChange={(e) => setWifiPassInput(e.target.value)}
+            style={{ flex: 1, minWidth: '160px', padding: '10px', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '13px' }}
+          />
+          <button 
+            type="submit"
+            disabled={connectingWifi || !wifiSsidInput.trim()}
+            style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #27ae60, #2ecc71)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 600, cursor: (connectingWifi || !wifiSsidInput.trim()) ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+          >
+            {connectingWifi ? 'Connecting...' : '🔌 Connect'}
+          </button>
+        </form>
+
+        {wifiMsg && (
+          <div style={{ marginTop: '12px', fontSize: '13px', fontWeight: 600, color: wifiMsg.includes('❌') ? '#e74c3c' : '#2ecc71' }}>
+            {wifiMsg}
+          </div>
+        )}
+      </div>
+
       {/* SECTION 2: CONTAINER MANAGEMENT */}
       <div className="status-panel" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '20px' }}>
         <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#3498db' }}>🐳 DOCKER CONTAINER MANAGEMENT</h3>
@@ -676,36 +828,75 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
                   </div>
                 </div>
 
-                <button
-                  onClick={async () => {
-                    const nextStatus = !isServiceable;
-                    try {
-                      const res = await fetch(`${config.API_BASE_URL}/locations/toggle_serviceability`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ location: loc, serviceable: nextStatus })
-                      });
-                      const data = await res.json();
-                      if (data.status === 'success') {
-                        setActionMsg(`Location '${loc}' set to ${nextStatus ? 'SERVICEABLE' : 'UNSERVICEABLE (DISABLED)'}`);
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={async () => {
+                      const nextStatus = !isServiceable;
+                      try {
+                        const res = await fetch(`${config.API_BASE_URL}/locations/toggle_serviceability`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ location: loc, serviceable: nextStatus })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                          setActionMsg(`Location '${loc}' set to ${nextStatus ? 'SERVICEABLE' : 'UNSERVICEABLE (DISABLED)'}`);
+                        }
+                      } catch (e) {
+                        setActionMsg('Failed to toggle location serviceability');
                       }
-                    } catch (e) {
-                      setActionMsg('Failed to toggle location serviceability');
-                    }
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    borderRadius: 'var(--radius)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    background: isServiceable ? 'linear-gradient(135deg, #c0392b, #e74c3c)' : 'linear-gradient(135deg, #27ae60, #2ecc71)',
-                    color: '#fff'
-                  }}
-                >
-                  {isServiceable ? 'Disable ⛔' : 'Enable 🟢'}
-                </button>
+                    }}
+                    style={{
+                      padding: '6px 10px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      borderRadius: 'var(--radius)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: isServiceable ? 'linear-gradient(135deg, #c0392b, #e74c3c)' : 'linear-gradient(135deg, #27ae60, #2ecc71)',
+                      color: '#fff'
+                    }}
+                  >
+                    {isServiceable ? 'Disable ⛔' : 'Enable 🟢'}
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      const confirmDelete = window.confirm(`Are you sure you want to permanently delete location "${loc.replace(/_/g, ' ')}"?`);
+                      if (!confirmDelete) return;
+                      try {
+                        const res = await fetch(`${config.API_BASE_URL}/locations/remove`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ location: loc })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setActionMsg(`Location '${loc}' removed successfully.`);
+                        } else {
+                          alert(data.error || 'Failed to remove location');
+                        }
+                      } catch (e) {
+                        setActionMsg('Error removing location');
+                      }
+                    }}
+                    style={{
+                      padding: '6px 8px',
+                      fontSize: '11px',
+                      borderRadius: 'var(--radius)',
+                      border: '1px solid rgba(231, 76, 60, 0.4)',
+                      cursor: 'pointer',
+                      background: 'rgba(231, 76, 60, 0.1)',
+                      color: '#e74c3c',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Delete location permanently"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             );
           })}

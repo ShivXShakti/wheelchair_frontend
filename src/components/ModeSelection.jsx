@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ModeSelection = ({ setScreen, healthData, onStartNavigation, onStartIntelligence }) => {
+const ModeSelection = ({ setScreen, healthData, onStartNavigation, onStartIntelligence, onReleaseWheelchair, isPaired }) => {
   const [subModeActive, setSubModeActive] = useState(false);
   const [launchingNav, setLaunchingNav] = useState(false);
   const [launchingIntel, setLaunchingIntel] = useState(false);
@@ -73,7 +73,7 @@ const ModeSelection = ({ setScreen, healthData, onStartNavigation, onStartIntell
             <div className="mode-desc">Type a command</div>
           </div>
           <div className="mode-card" onClick={() => setScreen('stations')}>
-            <div className="mode-icon">📍</div>
+            <div className="mode-icon">🦽</div>
             <div className="mode-label">Stations</div>
             <div className="mode-desc">Select destination</div>
           </div>
@@ -83,7 +83,8 @@ const ModeSelection = ({ setScreen, healthData, onStartNavigation, onStartIntell
   }
 
   return (
-    <div id="screen-home" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div id="screen-home" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
       <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>
         CHOOSE NAVIGATION MODE
       </p>

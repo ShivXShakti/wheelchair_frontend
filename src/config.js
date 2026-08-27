@@ -20,7 +20,16 @@ const config = {
   // Base URL of the backend API.
   // Set to empty string '' to use relative paths (same host/port as frontend).
   // Set to 'https://10.42.0.1:8443' or similar if running the frontend separately.
-  API_BASE_URL: ''
+  API_BASE_URL: '',
+
+  // Timer (in seconds) for auto-releasing wheelchair to 'ready_to_summon' state on goal arrival if rider does not respond
+  AUTO_RELEASE_TIMEOUT_SEC: 10,
+
+  // Idle time (in seconds) after teleoperating stops before prompting the user for further navigation
+  teleope_idle_f: 10,
+
+  // Time (in seconds) for auto-pressing Use Wheelchair button on summoning portal upon arrival
+  summon_portal_autodisconnect_time_f: 5
 };
 
 export default config;

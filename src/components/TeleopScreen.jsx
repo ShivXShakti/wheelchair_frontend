@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import config from '../config';
 
-const TeleopScreen = ({ goHome }) => {
+const TeleopScreen = ({ goHome, onActivity }) => {
   const [speed, setSpeed] = useState(0.2);
   const [isMoving, setIsMoving] = useState(false);
   const joystickRef = useRef(null);
@@ -45,10 +45,14 @@ const TeleopScreen = ({ goHome }) => {
     // Fire one last zero command
     commandRef.current = { linear_x: 0.0, angular_z: 0.0 };
     publishCommand();
+    if (onActivity) onActivity(false);
   };
 
   const publishCommand = () => {
     const { linear_x, angular_z } = commandRef.current;
+    if (linear_x !== 0.0 || angular_z !== 0.0) {
+      if (onActivity) onActivity(true);
+    }
     fetch(`${config.API_BASE_URL}/teleop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -147,7 +151,17 @@ const TeleopScreen = ({ goHome }) => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopPublishing();
+      if (publishIntervalRef.current) {
+        clearInterval(publishIntervalRef.current);
+        publishIntervalRef.current = null;
+      }
+      commandRef.current = { linear_x: 0.0, angular_z: 0.0 };
+      fetch(`${config.API_BASE_URL}/teleop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ linear_x: 0.0, angular_z: 0.0 }),
+        keepalive: true
+      }).catch(err => console.error("Teleop publish error:", err));
     };
   }, []);
 
@@ -155,7 +169,12 @@ const TeleopScreen = ({ goHome }) => {
     <div className="screen active" style={{ flex: 1, display: 'flex' }}>
       <div className="screen-header">
         <button className="back-btn" onClick={() => {
-          stopPublishing();
+          if (publishIntervalRef.current) {
+            clearInterval(publishIntervalRef.current);
+            publishIntervalRef.current = null;
+          }
+          commandRef.current = { linear_x: 0.0, angular_z: 0.0 };
+          publishCommand();
           goHome();
         }}>← Back</button>
         <span className="screen-title">Teleoperation</span>
