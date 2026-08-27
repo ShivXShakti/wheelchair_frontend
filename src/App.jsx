@@ -432,8 +432,8 @@ const App = () => {
           } catch(e) {}
         }
       }
-    } else if (isMovingNow) {
-      // If navigation is active (actively moving), ensure arrival modals are closed and reset tracking ref
+    } else if (isMovingNow && destination !== null) {
+      // If navigation is active (actively moving) and we have an active destination, ensure arrival modals are closed and reset tracking ref
       setShowUseWheelchairModal(false);
       setShowArrivalContinuationModal(false);
       hasHandledArrivalRef.current = false;
