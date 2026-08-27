@@ -334,10 +334,18 @@ const App = () => {
   }, [showArrivalContinuationModal]);
 
   const handleContinuationYes = () => {
+    if (teleopTimeoutRef.current) {
+      clearTimeout(teleopTimeoutRef.current);
+      teleopTimeoutRef.current = null;
+    }
     setShowArrivalContinuationModal(false);
   };
 
   const handleContinuationNo = async () => {
+    if (teleopTimeoutRef.current) {
+      clearTimeout(teleopTimeoutRef.current);
+      teleopTimeoutRef.current = null;
+    }
     setShowArrivalContinuationModal(false);
     await handleReleaseWheelchair();
   };
@@ -435,8 +443,27 @@ const App = () => {
 
   const emergencyStop = async () => {
     speak('Emergency stop.');
+    
+    // Set destination name for the continuation modal
+    const locName = destination || healthData?.last_destination || arrivedStationName || 'Last Location';
+    setArrivedGoalName(locName);
+    setArrivedStationName(locName);
+
     setDestination(null);
     updateStatus('ros', 'working', 'Stopping...');
+
+    // Trigger continuation modal and transition to home screen
+    setShowArrivalContinuationModal(true);
+    setCurrentScreen('home');
+
+    // Make sure usage_state is locked to in_use during stop decision
+    try {
+      fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'in_use', station: locName })
+      });
+    } catch(e) {}
 
     const payload = JSON.stringify({ devMode });
     const controller = new AbortController();
