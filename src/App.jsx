@@ -57,6 +57,11 @@ const App = () => {
     return 'welcome';
   });
 
+  const currentScreenRef = useRef(currentScreen);
+  useEffect(() => {
+    currentScreenRef.current = currentScreen;
+  }, [currentScreen]);
+
   const [sessionAllowed, setSessionAllowed] = useState(true);
   const [sessionBlockedReason, setSessionBlockedReason] = useState('');
 
@@ -282,7 +287,7 @@ const App = () => {
       teleopTimeoutRef.current = null;
     }
 
-    if (active === false) {
+    if (active === false && currentScreenRef.current === 'teleop') {
       // Joystick released: start idle countdown of teleope_idle_f seconds
       const idleSeconds = config.teleope_idle_f || 10;
       teleopTimeoutRef.current = setTimeout(() => {
