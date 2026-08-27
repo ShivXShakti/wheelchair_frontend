@@ -828,36 +828,75 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
                   </div>
                 </div>
 
-                <button
-                  onClick={async () => {
-                    const nextStatus = !isServiceable;
-                    try {
-                      const res = await fetch(`${config.API_BASE_URL}/locations/toggle_serviceability`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ location: loc, serviceable: nextStatus })
-                      });
-                      const data = await res.json();
-                      if (data.status === 'success') {
-                        setActionMsg(`Location '${loc}' set to ${nextStatus ? 'SERVICEABLE' : 'UNSERVICEABLE (DISABLED)'}`);
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={async () => {
+                      const nextStatus = !isServiceable;
+                      try {
+                        const res = await fetch(`${config.API_BASE_URL}/locations/toggle_serviceability`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ location: loc, serviceable: nextStatus })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                          setActionMsg(`Location '${loc}' set to ${nextStatus ? 'SERVICEABLE' : 'UNSERVICEABLE (DISABLED)'}`);
+                        }
+                      } catch (e) {
+                        setActionMsg('Failed to toggle location serviceability');
                       }
-                    } catch (e) {
-                      setActionMsg('Failed to toggle location serviceability');
-                    }
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    borderRadius: 'var(--radius)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    background: isServiceable ? 'linear-gradient(135deg, #c0392b, #e74c3c)' : 'linear-gradient(135deg, #27ae60, #2ecc71)',
-                    color: '#fff'
-                  }}
-                >
-                  {isServiceable ? 'Disable ⛔' : 'Enable 🟢'}
-                </button>
+                    }}
+                    style={{
+                      padding: '6px 10px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      borderRadius: 'var(--radius)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: isServiceable ? 'linear-gradient(135deg, #c0392b, #e74c3c)' : 'linear-gradient(135deg, #27ae60, #2ecc71)',
+                      color: '#fff'
+                    }}
+                  >
+                    {isServiceable ? 'Disable ⛔' : 'Enable 🟢'}
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      const confirmDelete = window.confirm(`Are you sure you want to permanently delete location "${loc.replace(/_/g, ' ')}"?`);
+                      if (!confirmDelete) return;
+                      try {
+                        const res = await fetch(`${config.API_BASE_URL}/locations/remove`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ location: loc })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setActionMsg(`Location '${loc}' removed successfully.`);
+                        } else {
+                          alert(data.error || 'Failed to remove location');
+                        }
+                      } catch (e) {
+                        setActionMsg('Error removing location');
+                      }
+                    }}
+                    style={{
+                      padding: '6px 8px',
+                      fontSize: '11px',
+                      borderRadius: 'var(--radius)',
+                      border: '1px solid rgba(231, 76, 60, 0.4)',
+                      cursor: 'pointer',
+                      background: 'rgba(231, 76, 60, 0.1)',
+                      color: '#e74c3c',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Delete location permanently"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             );
           })}
