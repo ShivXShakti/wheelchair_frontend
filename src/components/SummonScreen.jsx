@@ -23,7 +23,23 @@ const SummonScreen = ({
   const navReady = !!healthData?.nav2_ready;
   const usageState = healthData?.usage_state || 'ready_to_summon';
   const activeStation = healthData?.active_summon_station || destination || '';
-  const isNavActive = (healthData?.is_navigating === true) || (healthData?.nav2_status && !["Unknown", "Idle", "Reached", "Failed", "Canceled"].includes(healthData.nav2_status));
+  // Parse nav2_status if it is a JSON string
+  let parsedStatus = 'unknown';
+  const rawStatus = healthData?.nav2_status;
+  if (rawStatus) {
+    if (typeof rawStatus === 'string' && rawStatus.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(rawStatus);
+        parsedStatus = String(parsed.status || 'unknown').toLowerCase();
+      } catch (e) {
+        parsedStatus = String(rawStatus).toLowerCase();
+      }
+    } else {
+      parsedStatus = String(rawStatus).toLowerCase();
+    }
+  }
+
+  const isNavActive = (healthData?.is_navigating === true) || ["executing", "navigating", "moving"].includes(parsedStatus);
   const isBusy = (usageState === 'in_use' || usageState === 'summoning' || isNavActive) && !isPaired;
   const isLocked = isBusy || !sessionAllowed || usageState === 'summon_cancelled';
   // Display all locations / stations from loaded map semantics
