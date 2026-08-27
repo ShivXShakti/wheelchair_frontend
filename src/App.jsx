@@ -290,7 +290,6 @@ const App = () => {
         setArrivedGoalName("Teleop Mode");
         setArrivedStationName("Teleop Mode");
         setShowArrivalContinuationModal(true);
-        setCurrentScreen('home');
         try {
           fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
             method: 'POST',
