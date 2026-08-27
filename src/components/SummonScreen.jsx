@@ -41,7 +41,7 @@ const SummonScreen = ({
 
   const isNavActive = (healthData?.is_navigating === true) || ["executing", "navigating", "moving"].includes(parsedStatus);
   const isBusy = (usageState === 'in_use' || usageState === 'summoning' || isNavActive) && !isPaired;
-  const isLocked = isBusy || !sessionAllowed || usageState === 'summon_cancelled';
+  const isLocked = isBusy || !sessionAllowed;
   // Display all locations / stations from loaded map semantics
   const stations = healthData?.location_names || healthData?.wheelchair_stations || [];
 
@@ -188,92 +188,100 @@ const SummonScreen = ({
         </div>
       )}
 
-      {/* Busy / Lock Status Banner */}
-      {isBusy && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(231, 76, 60, 0.2), rgba(192, 57, 43, 0.3))',
-          border: '2px solid #e74c3c',
-          borderRadius: 'var(--radius)',
-          padding: '18px',
-          marginBottom: '20px',
-          textAlign: 'center',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
-        }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>⛔</div>
-          <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#ff6b6b', fontWeight: 800 }}>
-            {usageState === 'in_use' ? 'WHEELCHAIR CURRENTLY IN A TRIP' : 'SUMMONING IN PROGRESS'}
-          </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-            {usageState === 'in_use'
-              ? 'The wheelchair is currently in use by another rider. Summoning is locked until the current trip finishes.'
-              : `The wheelchair is currently traveling to ${activeStation.replace(/_/g, ' ')}. Please wait.`}
-          </p>
-        </div>
-      )}
-
-      {/* System Readiness Status Card */}
-      <div style={{
-        background: 'var(--surface)',
-        border: `1px solid ${navReady ? '#2ecc71' : '#e74c3c'}`,
-        borderRadius: 'var(--radius)',
-        padding: '20px',
-        marginBottom: '20px',
-        textAlign: 'center',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
-      }}>
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>
-          {navReady ? '⚡' : '⏳'}
-        </div>
-        <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: navReady ? '#2ecc71' : '#e74c3c' }}>
-          {navReady ? 'WHEELCHAIR READY TO SUMMON' : 'WHEELCHAIR SYSTEM INITIALIZING'}
-        </h3>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
-          {navReady 
-            ? 'Select your current station below to call the wheelchair to your location.' 
-            : 'Navigation hardware is starting up. Please wait for readiness.'}
-        </p>
-
-        {!navReady && (
-          <button 
-            onClick={handleStartNav}
-            disabled={launchingNav}
-            style={{
-              marginTop: '14px',
-              padding: '10px 20px',
-              fontSize: '13px',
-              fontWeight: 600,
-              background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
-              color: '#fff',
-              border: 'none',
+      {/* Mutually Exclusive Status Cards */}
+      {(() => {
+        if (isBusy) {
+          return (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(231, 76, 60, 0.2), rgba(192, 57, 43, 0.3))',
+              border: '2px solid #e74c3c',
               borderRadius: 'var(--radius)',
-              cursor: launchingNav ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {launchingNav ? 'Starting Navigation...' : '🚀 Launch Navigation Hardware'}
-          </button>
-        )}
-      </div>
+              padding: '18px',
+              marginBottom: '20px',
+              textAlign: 'center',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>⛔</div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#ff6b6b', fontWeight: 800 }}>
+                {usageState === 'in_use' ? 'WHEELCHAIR CURRENTLY IN A TRIP' : 'SUMMONING IN PROGRESS'}
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                {usageState === 'in_use'
+                  ? 'The wheelchair is currently in use by another rider. Summoning is locked until the current trip finishes.'
+                  : `The wheelchair is currently traveling to ${activeStation.replace(/_/g, ' ')}. Please wait.`}
+              </p>
+            </div>
+          );
+        }
 
-      {/* Summon Cancelled Status Banner */}
-      {usageState === 'summon_cancelled' && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(230, 126, 34, 0.2), rgba(211, 84, 0, 0.3))',
-          border: '2px solid #e67e22',
-          borderRadius: 'var(--radius)',
-          padding: '18px',
-          marginBottom: '20px',
-          textAlign: 'center',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
-        }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
-          <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#f39c12', fontWeight: 800 }}>
-            SUMMONING GOAL CANCELLED
-          </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-            The wheelchair operator cancelled the summoning trip. Please wait for the wheelchair to be reset.
-          </p>
-        </div>
-      )}
+        if (usageState === 'summon_cancelled') {
+          return (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(243, 156, 18, 0.2), rgba(211, 84, 0, 0.3))',
+              border: '2px solid #f39c12',
+              borderRadius: 'var(--radius)',
+              padding: '18px',
+              marginBottom: '20px',
+              textAlign: 'center',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#f39c12', fontWeight: 800 }}>
+                SUMMONING CANCELLED BY WHEELCHAIR
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                The previous summon request was cancelled by the wheelchair system. You can select a station below to summon it again.
+              </p>
+            </div>
+          );
+        }
+
+        return (
+          <div style={{
+            background: 'var(--surface)',
+            border: `1px solid ${navReady ? '#2ecc71' : '#e74c3c'}`,
+            borderRadius: 'var(--radius)',
+            padding: '20px',
+            marginBottom: '20px',
+            textAlign: 'center',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>
+              {navReady ? '⚡' : '⏳'}
+            </div>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: navReady ? '#2ecc71' : '#e74c3c' }}>
+              {navReady ? 'WHEELCHAIR READY TO SUMMON' : 'WHEELCHAIR SYSTEM INITIALIZING'}
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+              {navReady 
+                ? 'Select your current station below to call the wheelchair to your location.' 
+                : 'Navigation hardware is starting up. Please wait for readiness.'}
+            </p>
+
+            {!navReady && (
+              <button 
+                onClick={handleStartNav}
+                disabled={launchingNav}
+                style={{
+                  marginTop: '14px',
+                  padding: '10px 20px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 'var(--radius)',
+                  cursor: launchingNav ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {launchingNav ? 'Starting Navigation...' : '🚀 Launch Navigation Hardware'}
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
+
 
       {/* Available Wheelchair Stations List */}
       <div style={{ flex: 1, overflowY: 'auto' }}>

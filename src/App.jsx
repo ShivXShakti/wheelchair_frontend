@@ -320,6 +320,7 @@ const App = () => {
             // Timeout expired! Auto-release wheelchair state to ready_to_summon
             handleReleaseWheelchair();
             setShowArrivalContinuationModal(false);
+            setCurrentScreen('welcome');
             return 0;
           }
           return prev - 1;
@@ -332,6 +333,22 @@ const App = () => {
       if (timer) clearInterval(timer);
     };
   }, [showArrivalContinuationModal]);
+
+  // Configurable Auto-Timeout for Use Wheelchair Modal (Unauthorized Summoner)
+  useEffect(() => {
+    let timer = null;
+    const initialSec = config.AUTO_RELEASE_TIMEOUT_SEC || 10;
+    if (showUseWheelchairModal) {
+      timer = setTimeout(() => {
+        handleReleaseWheelchair();
+        setShowUseWheelchairModal(false);
+        setDestination(null);
+      }, initialSec * 1000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [showUseWheelchairModal]);
 
   const handleContinuationYes = () => {
     if (teleopTimeoutRef.current) {
@@ -348,6 +365,7 @@ const App = () => {
     }
     setShowArrivalContinuationModal(false);
     await handleReleaseWheelchair();
+    setCurrentScreen('welcome');
   };
 
   useEffect(() => {
@@ -376,7 +394,6 @@ const App = () => {
         setArrivedGoalName(locName);
         setArrivedStationName(locName);
         setShowArrivalContinuationModal(true);
-        setCurrentScreen('home');
         try {
           fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
             method: 'POST',
