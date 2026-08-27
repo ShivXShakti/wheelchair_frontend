@@ -920,7 +920,8 @@ const App = () => {
           setStatus={updateStatus}
           addSystemBubble={(style, text, actionTag) => addSystemBubble('text', style, text, actionTag)}
           sendPrompt={executePrompt}
-          healthData={{ ...healthData, isDisconnected: currentScreen === 'summon_disconnected' }}
+          healthData={healthData}
+          isDisconnected={currentScreen === 'summon_disconnected'}
           onStartNavigation={startNavigation}
           speak={speak}
           streamUrl={streamUrl}

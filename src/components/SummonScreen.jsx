@@ -15,7 +15,8 @@ const SummonScreen = ({
   isPaired,
   onOpenPairingModal,
   sessionAllowed = true,
-  sessionBlockedReason = ''
+  sessionBlockedReason = '',
+  isDisconnected = false
 }) => {
   const [isSending, setIsSending] = useState(false);
   const [launchingNav, setLaunchingNav] = useState(false);
@@ -81,7 +82,7 @@ const SummonScreen = ({
   };
 
   // Render Clean Disconnected Screen after user clicks "Use Wheelchair"
-  if (healthData?.isDisconnected) {
+  if (isDisconnected) {
     return (
       <div className="screen active" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', maxWidth: '500px', margin: '0 auto', minHeight: '80vh' }}>
         <div style={{ fontSize: '72px', marginBottom: '16px' }}>♿</div>
