@@ -23,7 +23,10 @@ const config = {
   API_BASE_URL: '',
 
   // Timer (in seconds) for auto-releasing wheelchair to 'ready_to_summon' state on goal arrival if rider does not respond
-  AUTO_RELEASE_TIMEOUT_SEC: 10
+  AUTO_RELEASE_TIMEOUT_SEC: 10,
+
+  // Idle time (in seconds) after teleoperating stops before prompting the user for further navigation
+  teleope_idle_f: 10
 };
 
 export default config;

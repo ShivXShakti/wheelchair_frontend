@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import config from '../config';
 
-const TeleopScreen = ({ goHome }) => {
+const TeleopScreen = ({ goHome, onActivity }) => {
   const [speed, setSpeed] = useState(0.2);
   const [isMoving, setIsMoving] = useState(false);
   const joystickRef = useRef(null);
@@ -45,10 +45,14 @@ const TeleopScreen = ({ goHome }) => {
     // Fire one last zero command
     commandRef.current = { linear_x: 0.0, angular_z: 0.0 };
     publishCommand();
+    if (onActivity) onActivity(false);
   };
 
   const publishCommand = () => {
     const { linear_x, angular_z } = commandRef.current;
+    if (linear_x !== 0.0 || angular_z !== 0.0) {
+      if (onActivity) onActivity(true);
+    }
     fetch(`${config.API_BASE_URL}/teleop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

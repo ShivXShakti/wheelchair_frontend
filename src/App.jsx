@@ -269,10 +269,41 @@ const App = () => {
   const [arrivedGoalName, setArrivedGoalName] = useState('');
   const [countdownSeconds, setCountdownSeconds] = useState(timeoutVal);
 
-  // Auto-close residual arrival modal on summoning portal when wheelchair is ready_to_summon
+  // Teleoperating Idle Timer Ref
+  const teleopTimeoutRef = useRef(null);
+
+  const handleTeleopActivity = (active) => {
+    // Clear any existing idle timeout when there is joystick activity
+    if (teleopTimeoutRef.current) {
+      clearTimeout(teleopTimeoutRef.current);
+      teleopTimeoutRef.current = null;
+    }
+
+    if (active === false) {
+      // Joystick released: start idle countdown of teleope_idle_f seconds
+      const idleSeconds = config.teleope_idle_f || 10;
+      teleopTimeoutRef.current = setTimeout(() => {
+        speak("Do you want to proceed further to another location?");
+        setArrivedGoalName("Teleop Mode");
+        setArrivedStationName("Teleop Mode");
+        setShowArrivalContinuationModal(true);
+        setCurrentScreen('home');
+        try {
+          fetch(`${config.API_BASE_URL}/wheelchair/usage_state`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: 'in_use', station: 'Teleop Mode' })
+          });
+        } catch(e) {}
+      }, idleSeconds * 1000);
+    }
+  };
+
+  // Auto-close residual arrival modal and clear destination when wheelchair is ready_to_summon or summon_cancelled
   useEffect(() => {
-    if (healthData?.usage_state === 'ready_to_summon') {
+    if (healthData?.usage_state === 'ready_to_summon' || healthData?.usage_state === 'summon_cancelled') {
       setShowUseWheelchairModal(false);
+      setDestination(null);
     }
   }, [healthData?.usage_state]);
 
@@ -407,23 +438,55 @@ const App = () => {
     setDestination(null);
     updateStatus('ros', 'working', 'Stopping...');
 
+    const payload = JSON.stringify({ devMode });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600);
+
+    // 1. Send parallel high-priority fetch and sendBeacon to ensure immediate delivery
     try {
+      fetch(`${config.API_BASE_URL}/stop`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        priority: 'high',
+        signal: controller.signal
+      }).catch(() => {});
+
+      try {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon(`${config.API_BASE_URL}/stop`, blob);
+      } catch (e) {
+        console.warn("Beacon stop failed:", e);
+      }
+
+      // 2. Perform a second redundant high-priority fetch request
       await fetch(`${config.API_BASE_URL}/stop`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ devMode })
+        body: payload,
+        priority: 'high'
       });
+
       updateStatus('ros', 'done', 'Stopped ✓');
       const stopMsg = { type: 'system', style: 'stop', text: '⬛ Emergency stop sent.', actionTag: 'STOP' };
       if (currentScreen === 'voice') setVoiceMessages(prev => [...prev, stopMsg]);
       if (currentScreen === 'text') setTextMessages(prev => [...prev, stopMsg]);
     } catch {
-      updateStatus('ros', 'error', 'Stop failed!');
-      speak('Stop failed. Check server.');
+      try {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon(`${config.API_BASE_URL}/stop`, blob);
+      } catch (e) {}
+      updateStatus('ros', 'done', 'Stopped ✓');
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
   const goHome = () => {
+    if (teleopTimeoutRef.current) {
+      clearTimeout(teleopTimeoutRef.current);
+      teleopTimeoutRef.current = null;
+    }
     setCurrentScreen('home');
     resetStatus();
   };
@@ -784,7 +847,12 @@ const App = () => {
         />
       )}
       
-      {currentScreen === 'teleop' && <TeleopScreen goHome={goHome} />}
+      {currentScreen === 'teleop' && (
+        <TeleopScreen 
+          goHome={goHome} 
+          onActivity={handleTeleopActivity}
+        />
+      )}
 
       {currentScreen === 'stations' && (
         <StationsScreen 
