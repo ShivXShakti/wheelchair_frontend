@@ -305,13 +305,15 @@ const App = () => {
     }
   };
 
-  // Auto-close residual arrival modal and clear destination when wheelchair is ready_to_summon or summon_cancelled
+  // Auto-close residual arrival modal and clear destination when wheelchair is ready_to_summon or summon_cancelled, and auto-enter system when in_use
   useEffect(() => {
     if (healthData?.usage_state === 'ready_to_summon' || healthData?.usage_state === 'summon_cancelled') {
       setShowUseWheelchairModal(false);
       setDestination(null);
+    } else if (healthData?.usage_state === 'in_use' && currentScreen === 'welcome') {
+      setCurrentScreen('home');
     }
-  }, [healthData?.usage_state]);
+  }, [healthData?.usage_state, currentScreen]);
 
   // Configurable Auto-Timeout for Arrival Continuation Modal
   useEffect(() => {
@@ -413,9 +415,8 @@ const App = () => {
           setShowUseWheelchairModal(false);
         }
       } else {
-        // Authorized / On-Board Wheelchair Tablet
-        // ONLY show continuation modal if it was navigating a rider trip (state is in_use)
-        const isRiderTrip = healthData?.usage_state === 'in_use';
+        // ONLY show continuation modal if it was navigating a rider trip (state is in_use and destination is set)
+        const isRiderTrip = healthData?.usage_state === 'in_use' && destination !== null;
         if (isRiderTrip) {
           speak(`Reached ${locName}. Do you want to proceed further to another location?`);
           setArrivedGoalName(locName);
