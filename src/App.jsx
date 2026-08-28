@@ -623,8 +623,9 @@ const App = () => {
       return;
     }
     
-    // Start navigation stack
+    // Start both navigation and intelligence stacks
     await startNavigation();
+    await startIntelligence();
     
     // Wait until ready
     let checkCount = 0;
@@ -956,7 +957,10 @@ const App = () => {
           sendPrompt={executePrompt}
           healthData={healthData}
           isDisconnected={currentScreen === 'summon_disconnected'}
-          onStartNavigation={startNavigation}
+          onStartNavigation={async () => {
+            await startNavigation();
+            await startIntelligence();
+          }}
           speak={speak}
           streamUrl={streamUrl}
           isPaired={isPaired}
