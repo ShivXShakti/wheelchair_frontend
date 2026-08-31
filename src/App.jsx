@@ -762,7 +762,7 @@ const App = () => {
 
   return (
     <div className="shell">
-      {currentScreen !== 'welcome' && currentScreen !== 'summon' && <Header />}
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && <Header battery={healthData?.battery} />}
       
       {currentScreen !== 'welcome' && currentScreen !== 'summon' && (
         <div style={{display: 'flex', gap: '10px', margin: '20px 20px 0 20px'}}>
