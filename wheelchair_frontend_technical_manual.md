@@ -279,6 +279,12 @@ const handleSoundHorn = async () => {
    ros2 topic echo /wheelchair/horn
    ```
 
+- [7.4 Hardware, Wi-Fi & System Control Endpoints](#74-hardware-wi-fi--system-control-endpoints)
+- [8. Tailscale Remote Access & Summoning Portal Gating](#8-tailscale-remote-access--summoning-portal-gating)
+  - [8.1 Architecture & Latency Strategy](#81-architecture--latency-strategy)
+  - [8.2 Frontend Configuration Parameters](#82-frontend-configuration-parameters)
+  - [8.3 Tailscale Funnel & Let's Encrypt Setup](#83-tailscale-funnel--lets-encrypt-setup)
+
 ---
 
 ## 7. Complete API Reference & Feature Parameters
@@ -381,6 +387,46 @@ Gracefully halts tmux session `wheelchair_navigation`.
 
 #### `POST /system/relaunch_nav_pane`
 Restarts individual tmux navigation stack panes (`"0"` for Bringup, `"1"` for Loc/Nav2, `"2"` for Silica, `"3"` for Bridge, `"4"` for Sensors, or `"all"`).
+
+---
+
+## 8. Tailscale Remote Access & Summoning Portal Gating
+
+### 8.1 Architecture & Latency Strategy
+
+To optimize network performance and eliminate high-latency bottlenecks over remote networks (4G/5G cellular or VPNs), the frontend provides a dedicated **Tailscale Summoning-Only Gating Mode**:
+
+* **Local Network (`wheelchair@rrc`)**: All features (live MJPEG video streams, low-latency joystick teleoperation, developer dashboard, voice/text navigation) are fully accessible.
+* **Remote Network (Tailscale / Cellular)**: When `tailscale_f` is active, remote connections are restricted exclusively to the **Summoning Portal** (`summon`). Heavy data streams (camera feed, dense pointcloud updates) are suppressed to preserve minimal latency for summoning commands.
+
+### 8.2 Frontend Configuration Parameters
+
+In [`src/config.js`](file:///home/robot/wheelchair_ws/wheelchair_frontend/src/config.js):
+
+```javascript
+// Flag to enable/disable Tailscale-based frontend gating.
+// Set to true to restrict Tailscale connections strictly to the Summoning Portal
+tailscale_f: false,
+
+// Jetson Tailscale IPv4 address parameter (e.g. '100.92.36.15')
+tailscale_ip: '',
+TAILSCALE_IP: ''
+```
+
+### 8.3 Tailscale Funnel & Let's Encrypt Setup
+
+To allow **ANY mobile phone user** to open the Summoning Portal on cellular internet without installing the Tailscale app:
+
+1. **Launch Background Funnel (Port 443)**:
+   ```bash
+   tailscale funnel --bg https+insecure://localhost:8443
+   ```
+2. **Public Mobile URL**:
+   Any user can navigate directly to:
+   ```
+   https://ducky.tail0de3ff.ts.net
+   ```
+3. **SSL Certificate**: Tailscale automatically manages a trusted Let's Encrypt SSL certificate, ensuring zero browser security warnings on mobile Chrome or Safari.
 
 ---
 
