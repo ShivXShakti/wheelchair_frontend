@@ -438,6 +438,20 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
               </div>
             </div>
           )}
+
+          {/* Tailscale Gating Status */}
+          <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', textAlign: 'center' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>TAILSCALE GATING (tailscale_f)</div>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: config.tailscale_f ? '#2ecc71' : '#e67e22', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <span>{config.tailscale_f ? '🔒 Summon Portal Only' : '🌐 Full Network Access'}</span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              IP: {config.tailscale_ip || config.TAILSCALE_IP || 'Auto-detect'}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              {config.tailscale_f ? 'Live video & teleop disabled over Tailscale' : 'All controls available'}
+            </div>
+          </div>
         </div>
       </div>
 

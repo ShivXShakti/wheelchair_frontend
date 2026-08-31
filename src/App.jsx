@@ -49,9 +49,27 @@ const App = () => {
     return id;
   });
 
+  const isTailscaleHost = () => {
+    const host = window.location.hostname;
+    const configuredIp = config.tailscale_ip || config.TAILSCALE_IP;
+    return (
+      host.startsWith('100.') ||
+      host.includes('tailscale') ||
+      (configuredIp && host === configuredIp)
+    );
+  };
+
+  const isTailscaleRestricted = () => {
+    return config.tailscale_f && isTailscaleHost();
+  };
+
   const [currentScreen, setCurrentScreen] = useState(() => {
-    // If URL has ?mode=summon or if device is not paired, go straight to summon screen!
-    if (window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
+    const host = window.location.hostname;
+    const configuredIp = config.tailscale_ip || config.TAILSCALE_IP;
+    const isTs = host.startsWith('100.') || host.includes('tailscale') || (configuredIp && host === configuredIp);
+    
+    // If tailscale_f is enabled and connection is over Tailscale, restrict to summon portal only!
+    if ((config.tailscale_f && isTs) || window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
       return 'summon';
     }
     return 'welcome';
@@ -60,6 +78,10 @@ const App = () => {
   const currentScreenRef = useRef(currentScreen);
   useEffect(() => {
     currentScreenRef.current = currentScreen;
+    if (isTailscaleRestricted() && currentScreen !== 'summon' && currentScreen !== 'summon_disconnected') {
+      console.warn("[TAILSCALE GATING] Tailscale-only mode enabled. Restricting to Summoning Portal.");
+      setCurrentScreen('summon');
+    }
   }, [currentScreen]);
 
   const [sessionAllowed, setSessionAllowed] = useState(true);

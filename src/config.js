@@ -29,7 +29,15 @@ const config = {
   teleope_idle_f: 10,
 
   // Time (in seconds) for auto-pressing Use Wheelchair button on summoning portal upon arrival
-  summon_portal_autodisconnect_time_f: 5
+  summon_portal_autodisconnect_time_f: 5,
+
+  // Flag to enable/disable Tailscale-based frontend gating.
+  // Set to true to restrict Tailscale connections strictly to the Summoning Portal (disables live video/teleop/dev controls for minimal latency)
+  tailscale_f: false,
+
+  // Tailscale IP address parameter for the Jetson (e.g. '100.x.x.x')
+  tailscale_ip: '',
+  TAILSCALE_IP: ''
 };
 
 export default config;
