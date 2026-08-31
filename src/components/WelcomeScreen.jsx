@@ -152,11 +152,43 @@ const WelcomeScreen = ({ navReady, onStart, healthData, onSetInitialPose, setScr
           🎺 Summon Wheelchair (Mobile)
         </button>
 
-        <div style={{ marginTop: '24px', fontSize: '13px', color: 'var(--text-muted)' }}>
-          System Status: {navReady ? (
-            <span style={{ color: '#2ecc71', fontWeight: 600 }}>Ready ✓</span>
-          ) : (
-            <span style={{ color: '#e74c3c', fontWeight: 600 }}>Offline ✗</span>
+        <div style={{ 
+          marginTop: '24px', 
+          fontSize: '13px', 
+          color: 'var(--text-muted)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <div>
+            System Status: {navReady ? (
+              <span style={{ color: '#2ecc71', fontWeight: 600 }}>Ready ✓</span>
+            ) : (
+              <span style={{ color: '#e74c3c', fontWeight: 600 }}>Offline ✗</span>
+            )}
+          </div>
+          
+          {healthData?.battery && (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              background: 'var(--surface2)',
+              padding: '4px 12px',
+              borderRadius: '12px',
+              border: '1px solid var(--border)',
+              marginTop: '4px'
+            }}>
+              <span>{Math.round(healthData.battery.percentage) < 20 ? '🪫' : '🔋'}</span>
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                {Math.round(healthData.battery.percentage)}%
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                ({healthData.battery.voltage.toFixed(1)}V
+                {healthData.battery.status === 'Charging' ? ' ⚡' : ''})
+              </span>
+            </div>
           )}
         </div>
 

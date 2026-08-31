@@ -127,7 +127,6 @@ const App = () => {
   // Check if Device Pairing Modal should be shown (Only for full on-board system access)
   useEffect(() => {
     if (currentScreen === 'summon' || currentScreen === 'summon_disconnected') {
-      setShowPairingModal(false);
       return;
     }
     if (healthData?.enable_developer !== false) {
@@ -306,13 +305,15 @@ const App = () => {
     }
   };
 
-  // Auto-close residual arrival modal and clear destination when wheelchair is ready_to_summon or summon_cancelled
+  // Auto-close residual arrival modal and clear destination when wheelchair is ready_to_summon or summon_cancelled, and auto-enter system when in_use
   useEffect(() => {
     if (healthData?.usage_state === 'ready_to_summon' || healthData?.usage_state === 'summon_cancelled') {
       setShowUseWheelchairModal(false);
       setDestination(null);
+    } else if (healthData?.usage_state === 'in_use' && currentScreen === 'welcome') {
+      setCurrentScreen('home');
     }
-  }, [healthData?.usage_state]);
+  }, [healthData?.usage_state, currentScreen]);
 
   // Configurable Auto-Timeout for Arrival Continuation Modal
   useEffect(() => {
@@ -414,9 +415,8 @@ const App = () => {
           setShowUseWheelchairModal(false);
         }
       } else {
-        // Authorized / On-Board Wheelchair Tablet
-        // ONLY show continuation modal if it was navigating a rider trip (state is in_use)
-        const isRiderTrip = healthData?.usage_state === 'in_use';
+        // ONLY show continuation modal if it was navigating a rider trip (state is in_use and destination is set)
+        const isRiderTrip = healthData?.usage_state === 'in_use' && destination !== null;
         if (isRiderTrip) {
           speak(`Reached ${locName}. Do you want to proceed further to another location?`);
           setArrivedGoalName(locName);
@@ -624,8 +624,9 @@ const App = () => {
       return;
     }
     
-    // Start navigation stack
+    // Start both navigation and intelligence stacks
     await startNavigation();
+    await startIntelligence();
     
     // Wait until ready
     let checkCount = 0;
@@ -761,7 +762,7 @@ const App = () => {
 
   return (
     <div className="shell">
-      {currentScreen !== 'welcome' && currentScreen !== 'summon' && <Header />}
+      {currentScreen !== 'welcome' && currentScreen !== 'summon' && <Header battery={healthData?.battery} />}
       
       {currentScreen !== 'welcome' && currentScreen !== 'summon' && (
         <div style={{display: 'flex', gap: '10px', margin: '20px 20px 0 20px'}}>
@@ -957,7 +958,10 @@ const App = () => {
           sendPrompt={executePrompt}
           healthData={healthData}
           isDisconnected={currentScreen === 'summon_disconnected'}
-          onStartNavigation={startNavigation}
+          onStartNavigation={async () => {
+            await startNavigation();
+            await startIntelligence();
+          }}
           speak={speak}
           streamUrl={streamUrl}
           isPaired={isPaired}
@@ -1044,13 +1048,26 @@ const App = () => {
                 onChange={(e) => setPairingKeyInput(e.target.value)}
                 style={{ padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '14px', textAlign: 'center' }}
               />
-              <button 
-                type="submit"
-                disabled={verifyingPairing}
-                style={{ padding: '12px', background: 'linear-gradient(135deg, #2980b9, #3498db)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 600, cursor: verifyingPairing ? 'not-allowed' : 'pointer' }}
-              >
-                {verifyingPairing ? 'Verifying...' : '🔑 Authorize Device'}
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowPairingModal(false);
+                    setPairingKeyInput('');
+                    setPairingMsg('');
+                  }}
+                  style={{ flex: 1, padding: '12px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={verifyingPairing}
+                  style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #2980b9, #3498db)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontWeight: 600, cursor: verifyingPairing ? 'not-allowed' : 'pointer' }}
+                >
+                  {verifyingPairing ? 'Verifying...' : '🔑 Authorize'}
+                </button>
+              </div>
             </form>
             {pairingMsg && (
               <div style={{ marginTop: '14px', fontSize: '12px', color: pairingMsg.includes('❌') ? '#e74c3c' : '#2ecc71', fontWeight: 500 }}>

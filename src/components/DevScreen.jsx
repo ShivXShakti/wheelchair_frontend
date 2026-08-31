@@ -34,7 +34,7 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
     setSaveMsg('');
     try {
       const res = await fetch(`${config.API_BASE_URL}/save_location`, {
-        method: 'POST',
+        method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: saveName.trim(),
@@ -421,6 +421,23 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
               🔄 System Reboot (sudo reboot now)
             </button>
           </div>
+
+          {/* Battery Telemetry */}
+          {healthData?.battery && (
+            <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', textAlign: 'center' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>BATTERY TELEMETRY</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <span>{Math.round(healthData.battery.percentage) < 20 ? '🪫' : '🔋'}</span>
+                <span>{Math.round(healthData.battery.percentage)}%</span>
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                {healthData.battery.voltage.toFixed(2)} V | {healthData.battery.current.toFixed(3)} A
+              </div>
+              <div style={{ fontSize: '11px', color: healthData.battery.status === 'Charging' ? '#2ecc71' : 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>
+                {healthData.battery.status === 'Charging' ? '⚡ Charging' : healthData.battery.status}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
