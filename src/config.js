@@ -36,8 +36,7 @@ const config = {
   tailscale_f: false,
 
   // Tailscale IP address parameter for the Jetson (e.g. '100.x.x.x')
-  tailscale_ip: '',
-  TAILSCALE_IP: ''
+  tailscale_ip: ''
 };
 
 export default config;

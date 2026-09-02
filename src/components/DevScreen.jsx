@@ -446,7 +446,7 @@ const DevScreen = ({ setScreen, healthData, onShutdownNavigation, onStartNavigat
               <span>{config.tailscale_f ? '🔒 Summon Portal Only' : '🌐 Full Network Access'}</span>
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-              IP: {config.tailscale_ip || config.TAILSCALE_IP || 'Auto-detect'}
+              IP: {config.tailscale_ip || 'Auto-detect'}
             </div>
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
               {config.tailscale_f ? 'Live video & teleop disabled over Tailscale' : 'All controls available'}
