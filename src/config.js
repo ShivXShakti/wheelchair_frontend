@@ -7,7 +7,7 @@ const config = {
   CAMERA_TOPIC: '/glass_detection/overlay',
 
   // Set to true to display the camera feed globally on the UI, false to hide it
-  SHOW_CAMERA: true,
+  SHOW_CAMERA: false,
 
   // The port where the ROS2 web_video_server is running
   // Changed to 8080 (the default) now that LLaMA runs on 8083
