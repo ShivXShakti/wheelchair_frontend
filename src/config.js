@@ -36,7 +36,12 @@ const config = {
   tailscale_f: false,
 
   // Tailscale IP address parameter for the Jetson (e.g. '100.x.x.x')
-  tailscale_ip: ''
+  tailscale_ip: '',
+
+  // Flag to control whether Tailscale connections can access the full frontend UI.
+  // When false (default), connections over Tailscale are strictly restricted to the lightweight Summoning Portal to minimize loading time and bandwidth over cellular/Tailscale DERP relays.
+  // Set to true to publish full frontend screens (Voice, Text, Teleop, Dev Mode) over Tailscale.
+  tailscale_full_frontend: false
 };
 
 export default config;

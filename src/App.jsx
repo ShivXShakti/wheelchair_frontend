@@ -28,10 +28,16 @@ const App = () => {
   const [streamUrl, setStreamUrl] = useState('');
 
   useEffect(() => {
-    if (config.SHOW_CAMERA) {
+    const isTs = isTailscaleHost();
+    const allowFull = config.tailscale_full_frontend === true;
+    const isRestricted = (isTs && !allowFull) || (config.tailscale_f && isTs);
+
+    if (config.SHOW_CAMERA && !isRestricted) {
       const topic = config.CAMERA_TOPIC || '/glass_detection/overlay';
       const url = `${config.API_BASE_URL}/camera_stream?topic=${encodeURIComponent(topic)}`;
       setStreamUrl(url);
+    } else {
+      setStreamUrl('');
     }
   }, []);
 
@@ -60,16 +66,19 @@ const App = () => {
   };
 
   const isTailscaleRestricted = () => {
-    return config.tailscale_f && isTailscaleHost();
+    const isTs = isTailscaleHost();
+    const allowFull = config.tailscale_full_frontend === true;
+    return (isTs && !allowFull) || (config.tailscale_f && isTs);
   };
 
   const [currentScreen, setCurrentScreen] = useState(() => {
     const host = window.location.hostname;
     const configuredIp = config.tailscale_ip || config.TAILSCALE_IP;
     const isTs = host.startsWith('100.') || host.includes('tailscale') || (configuredIp && host === configuredIp);
-    
-    // If tailscale_f is enabled and connection is over Tailscale, restrict to summon portal only!
-    if ((config.tailscale_f && isTs) || window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
+    const allowFull = config.tailscale_full_frontend === true;
+
+    // If accessing over Tailscale and tailscale_full_frontend is NOT true, restrict to summon portal!
+    if ((isTs && !allowFull) || (config.tailscale_f && isTs) || window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
       return 'summon';
     }
     return 'welcome';
@@ -79,7 +88,7 @@ const App = () => {
   useEffect(() => {
     currentScreenRef.current = currentScreen;
     if (isTailscaleRestricted() && currentScreen !== 'summon' && currentScreen !== 'summon_disconnected') {
-      console.warn("[TAILSCALE GATING] Tailscale-only mode enabled. Restricting to Summoning Portal.");
+      console.warn("[TAILSCALE GATING] Tailscale restricted mode. Restricting to Summoning Portal for minimal latency.");
       setCurrentScreen('summon');
     }
   }, [currentScreen]);
