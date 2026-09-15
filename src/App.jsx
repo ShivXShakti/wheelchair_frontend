@@ -61,7 +61,7 @@ const App = () => {
     return (
       host.startsWith('100.') ||
       host.includes('tailscale') ||
-      (configuredIp && host === configuredIp)
+      (configuredIp && configuredIp.length > 0 && host === configuredIp)
     );
   };
 
@@ -72,15 +72,17 @@ const App = () => {
   };
 
   const [currentScreen, setCurrentScreen] = useState(() => {
-    const host = window.location.hostname;
-    const configuredIp = config.tailscale_ip || config.TAILSCALE_IP;
-    const isTs = host.startsWith('100.') || host.includes('tailscale') || (configuredIp && host === configuredIp);
-    const allowFull = config.tailscale_full_frontend === true;
-
-    // If accessing over Tailscale and tailscale_full_frontend is NOT true, restrict to summon portal!
-    if ((isTs && !allowFull) || (config.tailscale_f && isTs) || window.location.search.includes('mode=summon') || !localStorage.getItem("device_pairing_token")) {
+    // 1. URL parameter ?mode=summon forces summoning portal
+    if (window.location.search.includes('mode=summon')) {
       return 'summon';
     }
+
+    // 2. Connections over Tailscale (when full frontend is NOT enabled) are restricted to summoning portal
+    if (isTailscaleRestricted()) {
+      return 'summon';
+    }
+
+    // 3. Local network / Onboard tablet access: Full Frontend access starting at Welcome screen!
     return 'welcome';
   });
 
