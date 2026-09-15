@@ -98,8 +98,14 @@ const App = () => {
   const [sessionAllowed, setSessionAllowed] = useState(true);
   const [sessionBlockedReason, setSessionBlockedReason] = useState('');
 
-  // Device Pairing & Dev Password Modals
-  const [isPaired, setIsPaired] = useState(() => !!localStorage.getItem("device_pairing_token"));
+  // Device Pairing & Dev Password Modals (Local network access is automatically paired/authorized!)
+  const [isPaired, setIsPaired] = useState(() => {
+    const isTs = isTailscaleHost();
+    const allowFull = config.tailscale_full_frontend === true;
+    const isRestricted = (isTs && !allowFull) || (config.tailscale_f && isTs);
+    if (!isRestricted) return true;
+    return !!localStorage.getItem("device_pairing_token");
+  });
   const [showPairingModal, setShowPairingModal] = useState(false);
   const [pairingKeyInput, setPairingKeyInput] = useState('');
   const [pairingMsg, setPairingMsg] = useState('');
@@ -157,9 +163,10 @@ const App = () => {
     };
   }, [clientId, currentScreen, isPaired]);
 
-  // Check if Device Pairing Modal should be shown (Only for full on-board system access)
+  // Check if Device Pairing Modal should be shown (Only for Tailscale restricted connections)
   useEffect(() => {
-    if (currentScreen === 'summon' || currentScreen === 'summon_disconnected') {
+    if (currentScreen === 'summon' || currentScreen === 'summon_disconnected' || !isTailscaleRestricted()) {
+      setShowPairingModal(false);
       return;
     }
     if (healthData?.enable_developer !== false) {
