@@ -57,11 +57,11 @@ const App = () => {
 
   const isTailscaleHost = () => {
     const host = window.location.hostname;
-    const configuredIp = config.tailscale_ip || config.TAILSCALE_IP;
+    // Tailscale IPs strictly start with 100. (100.64.0.0/10) or contain 'tailscale' / '.ts.net'
     return (
       host.startsWith('100.') ||
       host.includes('tailscale') ||
-      (configuredIp && configuredIp.length > 0 && host === configuredIp)
+      host.includes('.ts.net')
     );
   };
 
