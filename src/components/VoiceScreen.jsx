@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import Feed from './Feed';
 import config from '../config';
 
-const VoiceScreen = ({ goHome, destination, handleResponse, setStatus, speak, addSystemBubble, messages, devMode, nav2Ready }) => {
+const VoiceScreen = ({ goHome, destination, handleResponse, setStatus, speak, addSystemBubble, messages, sendPrompt, devMode, nav2Ready }) => {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -138,7 +138,7 @@ const VoiceScreen = ({ goHome, destination, handleResponse, setStatus, speak, ad
         <p className="mic-hint">{isRecording ? "Listening..." : "Hold to speak your command"}</p>
       </div>
 
-      <Feed messages={messages} sendPrompt={(prompt) => handleResponse({ prompt }, "voice", true)} />
+      <Feed messages={messages} sendPrompt={(prompt) => sendPrompt(prompt, "voice")} />
     </div>
   );
 };
